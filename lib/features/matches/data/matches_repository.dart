@@ -13,6 +13,40 @@ class MatchesRepository {
     await _firestore.collection('matches').doc(matchId).update({'status': newStatus});
   }
 
+  // Elimina un match de la base de datos (para limpiar el historial)
+  Future<void> deleteMatch(String matchId) async {
+    await _firestore.collection('matches').doc(matchId).delete();
+  }
+
+// Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
+  Future<void> completeMatchAndRate(String matchId, String providerId, double rating) async {
+    // 1. Cambiamos el estado del match a 'completed'
+    await _firestore.collection('matches').doc(matchId).update({'status': 'completed'});
+
+    // 2. Usamos una "Transacción" para leer y actualizar el perfil del proveedor de forma segura
+    final providerRef = _firestore.collection('users').doc(providerId);
+    
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(providerRef);
+      if (!snapshot.exists) return;
+
+      final data = snapshot.data()!;
+      // Si el usuario es nuevo y no tiene calificaciones, empezamos en 0
+      final int currentTotal = data['totalReviews'] ?? 0;
+      final double currentAvg = (data['averageRating'] ?? 0.0).toDouble();
+
+      // Fórmula para actualizar el promedio
+      final int newTotal = currentTotal + 1;
+      final double newAvg = ((currentAvg * currentTotal) + rating) / newTotal;
+
+      // Guardamos los nuevos datos en el perfil del proveedor
+      transaction.update(providerRef, {
+        'totalReviews': newTotal,
+        'averageRating': newAvg,
+      });
+    });
+  }
+
   // Crea una nueva solicitud de servicio
 Future<void> requestService(String serviceId, String providerId) async {
     final user = _auth.currentUser;

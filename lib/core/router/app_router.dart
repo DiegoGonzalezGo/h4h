@@ -6,6 +6,9 @@ import '../../features/auth/data/auth_repository.dart'; // Importamos el espía 
 import '../../features/users/presentation/profile_screen.dart';
 import '../../features/services/presentation/create_service_screen.dart';
 import '../../features/matches/presentation/provider_matches_screen.dart';
+import '../../features/services/presentation/my_services_screen.dart';
+import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/matches/presentation/client_matches_screen.dart';
 // Convertimos el enrutador en un Provider
 final goRouterProvider = Provider<GoRouter>((ref) {
   
@@ -56,7 +59,35 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/provider-matches',
         builder: (context, state) => const ProviderMatchesScreen(),
-),
+      ),
+      GoRoute(
+        path: '/my-services',
+        builder: (context, state) => const MyServicesScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:matchId', // Los dos puntos indican que es un parámetro dinámico
+        builder: (context, state) {
+          final matchId = state.pathParameters['matchId']!;
+          return ChatScreen(matchId: matchId);
+        },
+      ),
+      GoRoute(
+        path: '/client-matches',
+        builder: (context, state) => const ClientMatchesScreen(),
+      ),
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/feed',
+      ),
+      // Tus rutas actuales se quedan exactamente igual
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/feed',
+        builder: (context, state) => const ServicesFeedScreen(),
+      ),
     ],
   );
 });

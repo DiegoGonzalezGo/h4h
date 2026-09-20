@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart'; // Importante para la navegación al chat
 import '../data/matches_repository.dart';
 
 class ProviderMatchesScreen extends ConsumerWidget {
@@ -43,14 +44,13 @@ class ProviderMatchesScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.handshake)),
-                  // Como no tenemos el nombre del cliente en esta colección, mostramos una parte de su ID como referencia
-                 // SOLUCIÓN #3: Mostramos el nombre real del cliente
                   title: Text('Cliente: ${match.clientName}'),
                   subtitle: Text(
                     'Estado: $statusText',
                     style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
                   ),
-                  // Solo mostramos los botones si la solicitud sigue pendiente
+                  // Unificamos el trailing para manejar los 3 estados (pendiente, aceptado, rechazado)
+                  // Unificamos el trailing para manejar los 3 estados
                   trailing: match.status == 'pending'
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
@@ -71,7 +71,18 @@ class ProviderMatchesScreen extends ConsumerWidget {
                             ),
                           ],
                         )
-                      : null, // Si ya se aceptó/rechazó, ocultamos los botones
+                      : match.status == 'accepted' 
+                          ? IconButton(
+                              icon: const Icon(Icons.chat_bubble, color: Colors.blue),
+                              onPressed: () => context.push('/chat/${match.id}'),
+                            )
+                          : IconButton( // <-- Aquí agregamos la X para cuando el estado es 'rejected'
+                              icon: const Icon(Icons.close, color: Colors.grey),
+                              tooltip: 'Limpiar registro',
+                              onPressed: () {
+                                ref.read(matchesRepositoryProvider).deleteMatch(match.id);
+                              },
+                            ), // Ocultamos los botones si el estado es rechazado
                 ),
               );
             },

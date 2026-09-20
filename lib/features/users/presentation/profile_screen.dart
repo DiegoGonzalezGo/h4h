@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart'; // 1. Agregamos el import de GoRouter para poder navegar
 import '../data/user_model.dart';
@@ -116,7 +115,7 @@ class ProfileScreen extends ConsumerWidget {
                 // 4. Interfaz dinámica dependiendo del rol seleccionado
                 Expanded(
                   child: isClientMode 
-                    ? _buildClientView() // Restauramos la vista de cliente
+                    ? _buildClientView(context) // Restauramos la vista de cliente
                     : _buildProviderView(context), // 2. Le pasamos el context a la vista de proveedor
                 ),
               ],
@@ -127,19 +126,24 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // Vista restaurada: cuando el usuario quiere contratar servicios
-  Widget _buildClientView() {
+Widget _buildClientView(BuildContext context) {
     return ListView(
-      children: const [
+      children: [
         ListTile(
-          leading: Icon(Icons.search),
-          title: Text('Buscar nuevos servicios'),
-          trailing: Icon(Icons.chevron_right),
+          leading: const Icon(Icons.search),
+          title: const Text('Buscar nuevos servicios'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.go('/feed'); // Regresa al feed principal
+          },
         ),
         ListTile(
-          leading: Icon(Icons.history),
-          title: Text('Mis solicitudes (Match)'),
-          trailing: Icon(Icons.chevron_right),
+          leading: const Icon(Icons.history),
+          title: const Text('Mis solicitudes (Match)'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.push('/client-matches'); // Navega a la pantalla de solicitudes
+          },
         ),
       ],
     );
@@ -147,24 +151,38 @@ class ProfileScreen extends ConsumerWidget {
 
   // Vista unificada: cuando el usuario quiere ofrecer sus servicios
   // 3. Recibimos el BuildContext como parámetro
+  // Vista cuando el usuario ofrece servicios (Modo Proveedor)
+  // Vista cuando el usuario ofrece servicios (Modo Proveedor)
   Widget _buildProviderView(BuildContext context) {
     return ListView(
       children: [
+        // Botón 1: Crear / Publicar nuevo servicio (El que habíamos borrado)
         ListTile(
           leading: const Icon(Icons.add_circle_outline),
-          title: const Text('Publicar un nuevo servicio'),
+          title: const Text('Publicar nuevo servicio'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // 4. Como ahora tenemos el context directamente, la navegación es muy limpia
-            context.push('/create-service');
+            context.push('/create-service'); 
           },
         ),
+        
+        // Botón 2: Administrar el catálogo de servicios (Ocultar / Eliminar)
         ListTile(
-          leading: const Icon(Icons.list_alt),
+          leading: const Icon(Icons.work),
+          title: const Text('Mis servicios publicados'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.push('/my-services'); 
+          },
+        ),
+        
+        // Botón 3: Ver peticiones de clientes (Aceptar / Rechazar / Chat)
+        ListTile(
+          leading: const Icon(Icons.inbox),
           title: const Text('Solicitudes recibidas'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.push('/provider-matches'); // Navegamos a la nueva pantalla
+            context.push('/provider-matches'); 
           },
         ),
       ],
