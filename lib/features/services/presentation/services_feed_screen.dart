@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../data/services_repository.dart';
+import '../../matches/data/matches_repository.dart';
 
-// Cambiamos a ConsumerWidget para poder leer los datos en tiempo real
 class ServicesFeedScreen extends ConsumerWidget {
   const ServicesFeedScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Escuchamos el stream de servicios
     final servicesAsync = ref.watch(servicesFeedProvider);
 
     return Scaffold(
@@ -24,24 +23,37 @@ class ServicesFeedScreen extends ConsumerWidget {
           )
         ],
       ),
-      // Usamos .when para manejar los 3 estados: Cargando, Error y Datos listos
       body: servicesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text('Ocurrió un error: $error')),
         data: (services) {
-          // Si la lista está vacía
           if (services.isEmpty) {
             return const Center(
               child: Text('Aún no hay servicios publicados. ¡Sé el primero!'),
             );
           }
 
-          // Si hay datos, mostramos una lista de tarjetas
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: services.length,
-            itemBuilder: (context, index) {
+           itemBuilder: (context, index) {
               final service = services[index];
+              
+              // Leemos las solicitudes del usuario actual en tiempo real
+              final myMatches = ref.watch(clientMatchesProvider).value ?? [];
+              
+              // Buscamos si ya pedimos ESTE servicio específico
+              final existingMatch = myMatches.where((m) => m.serviceId == service.id).firstOrNull;
+              final isRequested = existingMatch != null;
+
+              // Cambiamos el texto dinámicamente según el estado
+              String buttonText = 'Solicitar Servicio';
+              if (isRequested) {
+                if (existingMatch.status == 'pending') buttonText = 'Pendiente';
+                else if (existingMatch.status == 'accepted') buttonText = 'Aceptada';
+                else if (existingMatch.status == 'rejected') buttonText = 'Rechazada';
+              }
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 elevation: 2,
@@ -50,6 +62,7 @@ class ServicesFeedScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // --- AQUÍ ESTÁ EL CÓDIGO RESTAURADO DEL TÍTULO Y PRECIO ---
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -83,16 +96,30 @@ class ServicesFeedScreen extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 16),
+                      // --- FIN DEL CÓDIGO RESTAURADO ---
+
                       Align(
                         alignment: Alignment.centerRight,
                         child: FilledButton.tonal(
-                          onPressed: () {
-                            // Aquí irá la lógica para solicitar el servicio (Match)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Solicitando "${service.title}"...')),
-                            );
+                          // Si ya está solicitado, el onPressed se vuelve null (Desactiva el botón)
+                          onPressed: isRequested ? null : () async {
+                            try {
+                              await ref.read(matchesRepositoryProvider).requestService(
+                                service.id,
+                                service.providerId,
+                              );
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString().replaceAll('Exception: ', '')), 
+                                    backgroundColor: Colors.red
+                                  ),
+                                );
+                              }
+                            }
                           },
-                          child: const Text('Solicitar Servicio'),
+                          child: Text(buttonText),
                         ),
                       )
                     ],
@@ -100,9 +127,9 @@ class ServicesFeedScreen extends ConsumerWidget {
                 ),
               );
             },
-          );
-        },
-      ),
-    );
+          ); // Cierre de ListView.builder
+        }, // Cierre de data
+      ), // Cierre de body
+    ); // Cierre de Scaffold
   }
 }

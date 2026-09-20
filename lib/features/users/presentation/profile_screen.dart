@@ -7,8 +7,12 @@ import '../data/user_model.dart';
 import '../../auth/data/auth_repository.dart';
 
 // 1. Proveedor que consulta Firestore para traer el perfil completo del usuario logueado
+// 1. Proveedor que consulta Firestore para traer el perfil completo del usuario logueado
 final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  final user = FirebaseAuth.instance.currentUser;
+  // En lugar de leer FirebaseAuth directamente, ESCUCHAMOS el estado de la sesión
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
+
   if (user == null) return null;
   
   final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -155,10 +159,13 @@ class ProfileScreen extends ConsumerWidget {
             context.push('/create-service');
           },
         ),
-        const ListTile( // Agregamos 'const' aquí para optimizar el segundo elemento
-          leading: Icon(Icons.work_outline),
-          title: Text('Mis servicios activos'),
-          trailing: Icon(Icons.chevron_right),
+        ListTile(
+          leading: const Icon(Icons.list_alt),
+          title: const Text('Solicitudes recibidas'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.push('/provider-matches'); // Navegamos a la nueva pantalla
+          },
         ),
       ],
     );

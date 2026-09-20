@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'service_model.dart'; // El modelo que creamos en los primeros pasos
+import 'service_model.dart'; 
+import '../../auth/data/auth_repository.dart';
 
 class ServicesRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -16,13 +17,12 @@ class ServicesRepository {
     if (user == null) throw Exception('Debes iniciar sesión para publicar');
 
     // 1. Creamos una referencia a un nuevo documento vacío en 'services'
-    // Esto genera un ID único automáticamente antes de guardar nada
     final docRef = _firestore.collection('services').doc();
 
     // 2. Construimos el objeto del servicio
     final newService = ServiceModel(
       id: docRef.id,
-      providerId: user.uid, // Vinculamos el servicio al usuario actual
+      providerId: user.uid, 
       title: title,
       description: description,
       price: price,
@@ -32,15 +32,21 @@ class ServicesRepository {
     // 3. Guardamos los datos en Firestore
     await docRef.set(newService.toMap());
   }
-}
+} // <-- Fin de la clase
 
-// Exponemos el repositorio globalmente
+// ¡ESTA ES LA LÍNEA QUE FALTABA! Exponemos el repositorio para que la interfaz lo pueda usar
 final servicesRepositoryProvider = Provider<ServicesRepository>((ref) => ServicesRepository());
-// Este proveedor lee la colección 'services' en tiempo real y la convierte en una lista de ServiceModel
+
 final servicesFeedProvider = StreamProvider<List<ServiceModel>>((ref) {
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
+
+  if (user == null) return const Stream.empty();
+
   return FirebaseFirestore.instance
       .collection('services')
-      .where('isActive', isEqualTo: true) // Solo traemos los que estén activos
+      .where('isActive', isEqualTo: true)
+      .where('providerId', isNotEqualTo: user.uid) // Excluye mis servicios
       .snapshots()
       .map((snapshot) {
         return snapshot.docs

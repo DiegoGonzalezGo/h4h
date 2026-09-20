@@ -5,7 +5,7 @@ import '../../features/services/presentation/services_feed_screen.dart';
 import '../../features/auth/data/auth_repository.dart'; // Importamos el espía que acabamos de crear
 import '../../features/users/presentation/profile_screen.dart';
 import '../../features/services/presentation/create_service_screen.dart';
-
+import '../../features/matches/presentation/provider_matches_screen.dart';
 // Convertimos el enrutador en un Provider
 final goRouterProvider = Provider<GoRouter>((ref) {
   
@@ -53,6 +53,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/create-service',
         builder: (context, state) => const CreateServiceScreen(),
       ),
+      GoRoute(
+        path: '/provider-matches',
+        builder: (context, state) => const ProviderMatchesScreen(),
+),
     ],
   );
 });
