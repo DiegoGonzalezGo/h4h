@@ -36,3 +36,15 @@ class ServicesRepository {
 
 // Exponemos el repositorio globalmente
 final servicesRepositoryProvider = Provider<ServicesRepository>((ref) => ServicesRepository());
+// Este proveedor lee la colección 'services' en tiempo real y la convierte en una lista de ServiceModel
+final servicesFeedProvider = StreamProvider<List<ServiceModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('services')
+      .where('isActive', isEqualTo: true) // Solo traemos los que estén activos
+      .snapshots()
+      .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => ServiceModel.fromMap(doc.data(), doc.id))
+            .toList();
+      });
+});
