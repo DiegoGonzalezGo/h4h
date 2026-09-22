@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Importante para poder navegar al chat
 import '../data/matches_repository.dart';
+import '../../services/data/services_repository.dart';
 
 class ClientMatchesScreen extends ConsumerWidget {
   const ClientMatchesScreen({super.key});
@@ -26,7 +27,7 @@ class ClientMatchesScreen extends ConsumerWidget {
             itemCount: matches.length,
             itemBuilder: (context, index) {
               final match = matches[index];
-              
+
               Color statusColor = Colors.orange;
               String statusText = 'Pendiente';
               IconData statusIcon = Icons.access_time;
@@ -39,77 +40,87 @@ class ClientMatchesScreen extends ConsumerWidget {
                 statusColor = Colors.red;
                 statusText = 'Solicitud Rechazada';
                 statusIcon = Icons.cancel;
-              } else if (match.status == 'completed') { // <-- NUEVO ESTADO
+              } else if (match.status == 'completed') {
                 statusColor = Colors.blue;
                 statusText = 'Servicio Completado';
                 statusIcon = Icons.verified;
               }
 
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: statusColor.withOpacity(0.2),
-                    child: Icon(statusIcon, color: statusColor),
-                  ),
-                  // Opcional: Si en un futuro guardas el título del servicio en el match, puedes mostrarlo aquí
-                  title: Text('Servicio ID: ${match.serviceId.substring(0, 5)}...'),
-                  subtitle: Text(
-                    statusText,
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-                  ),
-                  // ¡AQUÍ ESTÁ EL BOTÓN DE CHAT!
-                  // Solo aparece si el estado es 'accepted'
-                  // Muestra el chat si está aceptada, o la "X" para borrar si está rechazada
-                  // Lógica de botones dependiendo del estado
-                  trailing: match.status == 'accepted'
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.chat_bubble, color: Colors.blue),
-                              tooltip: 'Abrir Chat',
-                              onPressed: () => context.push('/chat/${match.id}'),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.star, color: Colors.amber),
-                              tooltip: 'Finalizar y Calificar',
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => RatingDialog(
-                                    onSubmit: (rating) {
-                                      ref.read(matchesRepositoryProvider).completeMatchAndRate(
-                                        match.id, 
-                                        match.providerId, 
-                                        rating,
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        )
-                      : (match.status == 'rejected' || match.status == 'completed')
-                          ? IconButton(
-                              icon: const Icon(Icons.close, color: Colors.grey),
-                              tooltip: 'Limpiar registro',
-                              onPressed: () {
-                                ref.read(matchesRepositoryProvider).deleteMatch(match.id);
-                              },
-                            )
-                          : null,
-                ),
+              // Usamos Consumer para obtener el nombre del servicio en lugar de su ID
+              return Consumer(
+                builder: (context, ref, child) {
+                  final serviceAsync = ref.watch(singleServiceProvider(match.serviceId));
+
+                  return serviceAsync.when(
+                    loading: () => const Card(child: ListTile(title: Text('Cargando...'))),
+                    error: (e, stack) => const Card(child: ListTile(title: Text('Error'))),
+                    data: (service) {
+                      final serviceName = service?.title ?? 'Servicio no disponible';
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: statusColor.withOpacity(0.2),
+                            child: Icon(statusIcon, color: statusColor),
+                          ),
+                          title: Text(serviceName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(
+                            statusText,
+                            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+                          ),
+                          // ... Aquí va toda tu lógica actual de los botones (trailing) ...
+                          trailing: match.status == 'accepted'
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.chat_bubble, color: Colors.blue),
+                                      tooltip: 'Abrir Chat',
+                                      onPressed: () => context.push('/chat/${match.id}'),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.star, color: Colors.amber),
+                                      tooltip: 'Finalizar y Calificar',
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (ctx) => RatingDialog(
+                                            onSubmit: (rating) {
+                                              ref.read(matchesRepositoryProvider).completeMatchAndRate(
+                                                match.id, 
+                                                match.providerId, 
+                                                rating,
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                )
+                              : (match.status == 'rejected' || match.status == 'completed')
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, color: Colors.grey),
+                                      tooltip: 'Limpiar registro',
+                                      onPressed: () {
+                                        ref.read(matchesRepositoryProvider).deleteMatch(match.id);
+                                      },
+                                    )
+                                  : null,
+                        ),
+                      );
+                    },
+                  );
+                }
               );
-            },
-          );
+            },        );
         },
       ),
     );
   }
 } 
+
 // Widget personalizado para mostrar las 5 estrellas interactivas
 class RatingDialog extends StatefulWidget {
   final Function(double) onSubmit;
@@ -167,3 +178,4 @@ class _RatingDialogState extends State<RatingDialog> {
     );
   }
 }
+

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/chat_repository.dart';
+import '../../matches/data/matches_repository.dart';
+import 'package:go_router/go_router.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String matchId; // Necesitamos saber de qué match es este chat
@@ -28,8 +30,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Escuchamos los mensajes de este match en particular
     final messagesAsync = ref.watch(chatMessagesProvider(widget.matchId));
 
+    // ASUMIENDO QUE TIENES ESTAS VARIABLES EN TU BUILD:
+    final matchAsync = ref.watch(matchDetailsProvider(widget.matchId)); // Reemplaza widget.matchId con tu variable
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat del Servicio')),
+      appBar: AppBar(
+        title: matchAsync.when(
+          data: (match) {
+            if (match == null || currentUserId == null) {
+              return const Text('Chat del Servicio');
+            }
+
+            // Determina el ID del otro usuario
+            final String otherUserId = match.clientId == currentUserId
+                ? match.providerId
+                : match.clientId;
+
+            // Muestra el nombre genérico basado en el rol (opcionalmente podrías buscar el nombre real)
+            final String otherUserName = match.clientId == currentUserId 
+                ? 'Proveedor' 
+                : match.clientName;
+
+            // --- NUEVO: ENVOLVEMOS EL TÍTULO EN UN GestureDetector ---
+            return GestureDetector(
+              onTap: () {
+                context.push('/user/$otherUserId');
+              },
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 16,
+                    child: Icon(Icons.person, size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(otherUserName, style: const TextStyle(fontSize: 16)),
+                ],
+              ),
+            );
+            // ---------------------------------------------------------
+          },
+          loading: () => const Text('Cargando...'),
+          error: (_, __) => const Text('Chat'),
+        ),
+      ),
       body: Column(
         children: [
           Expanded(

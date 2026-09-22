@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// variables de Modelo de datos para un match entre cliente y proveedor
 class MatchModel {
   final String id;
   final String serviceId;
@@ -5,7 +8,9 @@ class MatchModel {
   final String clientName; // <-- NUEVO: Guardaremos el nombre real
   final String providerId;
   final String status;
+  final DateTime? completedAt;
 
+// Constructor
   MatchModel({
     required this.id,
     required this.serviceId,
@@ -13,6 +18,7 @@ class MatchModel {
     required this.clientName, // <-- NUEVO
     required this.providerId,
     this.status = 'pending',
+    this.completedAt,
   });
 
   factory MatchModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -23,6 +29,9 @@ class MatchModel {
       clientName: map['clientName'] ?? 'Cliente', // <-- NUEVO (con valor por defecto)
       providerId: map['providerId'] ?? '',
       status: map['status'] ?? 'pending',
+      completedAt: map['completedAt'] != null 
+          ? (map['completedAt'] as Timestamp).toDate() 
+          : null,
     );
   }
 

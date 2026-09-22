@@ -1,46 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart'; // 1. Agregamos el import de GoRouter para poder navegar
-import '../data/user_model.dart';
+import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth/data/auth_repository.dart';
+import '../data/user_repository.dart';
 
-// 1. Proveedor que consulta Firestore para traer el perfil completo del usuario logueado
-// 1. Proveedor que consulta Firestore para traer el perfil completo del usuario logueado
-final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  // En lugar de leer FirebaseAuth directamente, ESCUCHAMOS el estado de la sesión
-  final authState = ref.watch(authStateProvider);
-  final user = authState.value;
-
-  if (user == null) return null;
-  
-  final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-  if (doc.exists) {
-    return UserModel.fromMap(doc.data()!, doc.id);
-  }
-  return null;
-});
-
-// 2. Proveedor moderno (Notifier) que controla el estado visual del rol
-class ClientModeNotifier extends Notifier<bool> {
+// 1. CORRECCIÓN: Usamos la estructura moderna NotifierProvider
+class ProviderMode extends Notifier<bool> {
   @override
-  bool build() => true; // Valor inicial: true (Modo Cliente)
+  bool build() => false; 
 
-  void setMode(bool value) {
-    state = value;
+  void toggleMode(bool isProvider) {
+    state = isProvider;
   }
 }
 
-final isClientModeProvider = NotifierProvider<ClientModeNotifier, bool>(ClientModeNotifier.new);
+final providerModeProvider = NotifierProvider<ProviderMode, bool>(ProviderMode.new);
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Escuchamos los datos del usuario y el estado del interruptor
-    final userAsync = ref.watch(currentUserProvider);
-    final isClientMode = ref.watch(isClientModeProvider);
+    // Escuchamos el estado del proveedor (Modo Cliente o Modo Proveedor)
+    final isProviderMode = ref.watch(providerModeProvider);
+    
+    // Obtenemos el ID del usuario actual para consultar sus datos
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    
+    if (userId == null) {
+      return const Scaffold(body: Center(child: Text('Usuario no encontrado')));
+    }
+
+    // Escuchamos los datos del perfil (Nombre y foto) en tiempo real
+    final userProfileAsync = ref.watch(userProfileStreamProvider(userId));
 
     return Scaffold(
       appBar: AppBar(
@@ -50,139 +43,145 @@ class ProfileScreen extends ConsumerWidget {
             icon: const Icon(Icons.logout),
             onPressed: () {
               ref.read(authRepositoryProvider).signOut();
+              context.go('/login');
             },
           )
         ],
       ),
-      body: userAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
-        data: (user) {
-          if (user == null) return const Center(child: Text('Usuario no encontrado'));
+      body: SingleChildScrollView( 
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            
+            // --- SECCIÓN DE ENCABEZADO (FOTO, NOMBRE Y BOTÓN DE EDITAR) ---
+            userProfileAsync.when(
+              loading: () => const CircularProgressIndicator(),
+              error: (e, stack) => const Icon(Icons.error),
+              data: (userData) {
+                final String name = userData['name'] ?? 'Usuario Hand4Hand';
+                final String? photoUrl = userData['photoUrl'];
 
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const CircleAvatar(
-                  radius: 50,
-                  child: Icon(Icons.person, size: 50),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  user.name,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                Text(
-                  user.email,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                ),
-                const SizedBox(height: 32),
-                
-                // 3. El componente clave: El interruptor de roles
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isClientMode ? Colors.blue.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isClientMode ? 'Modo Cliente' : 'Modo Proveedor',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isClientMode ? Colors.blue : Colors.green,
+                return Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.blue.shade100,
+                      backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                      child: photoUrl == null 
+                          ? const Icon(Icons.person, size: 50, color: Colors.white)
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      name,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    if (userData['bio'] != null && userData['bio'].toString().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0, left: 24, right: 24),
+                        child: Text(
+                          userData['bio'],
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade700, fontStyle: FontStyle.italic),
                         ),
                       ),
-                      Switch(
-                        value: isClientMode,
-                        activeColor: Colors.blue, 
-                        inactiveThumbColor: Colors.green, 
-                        inactiveTrackColor: Colors.green.withOpacity(0.5),
-                        onChanged: (value) {
-                          ref.read(isClientModeProvider.notifier).setMode(value);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // 4. Interfaz dinámica dependiendo del rol seleccionado
-                Expanded(
-                  child: isClientMode 
-                    ? _buildClientView(context) // Restauramos la vista de cliente
-                    : _buildProviderView(context), // 2. Le pasamos el context a la vista de proveedor
-                ),
-              ],
+                    const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Editar perfil'),
+                      onPressed: () {
+                        context.push('/edit-profile'); 
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
-          );
-        },
+            // --- FIN DEL ENCABEZADO ---
+
+            const SizedBox(height: 24),
+            const Divider(),
+            
+            // --- SWITCH DE MODO ---
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+              child: SwitchListTile(
+                title: const Text('Modo Proveedor'),
+                subtitle: const Text('Activa para ofrecer servicios'),
+                value: isProviderMode,
+                onChanged: (value) {
+                  // 2. CORRECCIÓN: Llamamos a la nueva función toggleMode
+                  ref.read(providerModeProvider.notifier).toggleMode(value);
+                },
+              ),
+            ),
+            const Divider(),
+            
+            // Renderizamos los menús dependiendo del modo
+            isProviderMode ? _buildProviderView(context) : _buildClientView(context),
+          ],
+        ),
       ),
     );
   }
 
-Widget _buildClientView(BuildContext context) {
-    return ListView(
+  Widget _buildProviderView(BuildContext context) {
+    return Column(
       children: [
         ListTile(
-          leading: const Icon(Icons.search),
-          title: const Text('Buscar nuevos servicios'),
+          leading: const Icon(Icons.add_circle_outline),
+          title: const Text('Publicar nuevo servicio'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.go('/feed'); // Regresa al feed principal
+            context.push('/create-service');
           },
         ),
         ListTile(
-          leading: const Icon(Icons.history),
-          title: const Text('Mis solicitudes (Match)'),
+          leading: const Icon(Icons.list_alt),
+          title: const Text('Mis servicios publicados'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.push('/client-matches'); // Navega a la pantalla de solicitudes
+            context.push('/my-services');
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.notifications_active),
+          title: const Text('Solicitudes entrantes'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.push('/provider-matches');
           },
         ),
       ],
     );
   }
 
-  // Vista unificada: cuando el usuario quiere ofrecer sus servicios
-  // 3. Recibimos el BuildContext como parámetro
-  // Vista cuando el usuario ofrece servicios (Modo Proveedor)
-  // Vista cuando el usuario ofrece servicios (Modo Proveedor)
-  Widget _buildProviderView(BuildContext context) {
-    return ListView(
+  Widget _buildClientView(BuildContext context) {
+    return Column(
       children: [
-        // Botón 1: Crear / Publicar nuevo servicio (El que habíamos borrado)
         ListTile(
-          leading: const Icon(Icons.add_circle_outline),
-          title: const Text('Publicar nuevo servicio'),
+          leading: const Icon(Icons.search),
+          title: const Text('Buscar servicios'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.push('/create-service'); 
+            context.go('/feed');
           },
         ),
-        
-        // Botón 2: Administrar el catálogo de servicios (Ocultar / Eliminar)
         ListTile(
-          leading: const Icon(Icons.work),
-          title: const Text('Mis servicios publicados'),
+          leading: const Icon(Icons.handshake),
+          title: const Text('Mis solicitudes enviadas'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.push('/my-services'); 
+            context.push('/client-matches');
           },
         ),
-        
-        // Botón 3: Ver peticiones de clientes (Aceptar / Rechazar / Chat)
         ListTile(
-          leading: const Icon(Icons.inbox),
-          title: const Text('Solicitudes recibidas'),
+          leading: const Icon(Icons.check_circle_outline),
+          title: const Text('Historial de servicios'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.push('/provider-matches'); 
+            context.push('/client-history'); 
           },
         ),
       ],

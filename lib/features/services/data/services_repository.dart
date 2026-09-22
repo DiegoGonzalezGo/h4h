@@ -8,29 +8,21 @@ class ServicesRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<void> createService({
-    required String title,
-    required String description,
-    required double price,
-  }) async {
+  // Recibe la categoría como nuevo parámetro
+  Future<void> createService(String title, String description, double price, String category) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('Debes iniciar sesión para publicar');
+    if (user == null) throw Exception('Usuario no autenticado');
 
-    // 1. Creamos una referencia a un nuevo documento vacío en 'services'
-    final docRef = _firestore.collection('services').doc();
-
-    // 2. Construimos el objeto del servicio
     final newService = ServiceModel(
-      id: docRef.id,
-      providerId: user.uid, 
-      title: title,
-      description: description,
+      id: '',
+      providerId: user.uid,
+      title: title.trim(),
+      description: description.trim(),
       price: price,
-      isActive: true,
+      category: category, // <-- Guarda la categoría
     );
 
-    // 3. Guardamos los datos en Firestore
-    await docRef.set(newService.toMap());
+    await _firestore.collection('services').add(newService.toMap());
   }
   // Cambia el estado de activo/inactivo
   Future<void> toggleServiceStatus(String serviceId, bool currentStatus) async {
@@ -82,4 +74,59 @@ final myServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
             .map((doc) => ServiceModel.fromMap(doc.data(), doc.id))
             .toList();
       });
+});
+
+// Proveedor para consultar los datos públicos del perfil de un proveedor (como sus estrellas)
+final providerProfileProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, providerId) async {
+  final doc = await FirebaseFirestore.instance.collection('users').doc(providerId).get();
+  return doc.data() ?? {};
+});
+
+// Proveedor actualizado que descarga los servicios y oculta los del propio usuario
+final activeServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
+  // 1. Revisamos quién es el usuario actual
+  final user = ref.watch(authStateProvider).value;
+
+  // 2. Traemos los servicios desde Firestore
+  return FirebaseFirestore.instance
+      .collection('services')
+      .where('isActive', isEqualTo: true)
+      .snapshots()
+      .map((snapshot) {
+        final services = snapshot.docs
+            .map((doc) => ServiceModel.fromMap(doc.data(), doc.id))
+            .toList();
+        
+        // 3. Si no hay usuario logueado, regresamos todo.
+        // Si sí lo hay, quitamos de la lista los servicios que le pertenecen.
+        if (user == null) return services;
+        return services.where((s) => s.providerId != user.uid).toList();
+      });
+});
+
+// Proveedor para consultar los datos de un solo servicio usando su ID
+final singleServiceProvider = FutureProvider.family<ServiceModel?, String>((ref, serviceId) async {
+  final doc = await FirebaseFirestore.instance.collection('services').doc(serviceId).get();
+  if (doc.exists) {
+    return ServiceModel.fromMap(doc.data()!, doc.id);
+  }
+  return null; // Si el proveedor borró el servicio, regresamos null
+});
+
+// Proveedor que trae a los 10 mejores proveedores ordenados por calificación
+final topProvidersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('users')
+      .orderBy('averageRating', descending: true) // Los de mayor calificación primero
+      .limit(10) // Solo traemos el Top 10 para no saturar la base de datos
+      .get();
+
+  // Mapeamos los datos y filtramos localmente para asegurar que tengan al menos 1 reseña
+  final allTop = snapshot.docs.map((doc) {
+    final data = doc.data();
+    data['id'] = doc.id; // Guardamos el ID del documento por si se necesita
+    return data;
+  }).toList();
+
+  return allTop.where((user) => (user['totalReviews'] ?? 0) > 0).toList();
 });

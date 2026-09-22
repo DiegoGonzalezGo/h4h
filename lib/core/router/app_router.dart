@@ -9,6 +9,11 @@ import '../../features/matches/presentation/provider_matches_screen.dart';
 import '../../features/services/presentation/my_services_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/matches/presentation/client_matches_screen.dart';
+import '../../features/matches/presentation/client_history_screen.dart';
+import '../../features/services/presentation/top_providers_screen.dart';
+import '../../features/users/presentation/edit_profile_screen.dart';
+import '../../features/users/presentation/public_profile_screen.dart';
+
 // Convertimos el enrutador en un Provider
 final goRouterProvider = Provider<GoRouter>((ref) {
   
@@ -88,6 +93,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/feed',
         builder: (context, state) => const ServicesFeedScreen(),
       ),
+      GoRoute(
+        path: '/client-history',
+        builder: (context, state) => const ClientHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/ranking',
+        builder: (context, state) => const TopProvidersScreen(),
+      ),
+      GoRoute(
+        path: '/edit-profile',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/user/:id',
+        builder: (context, state) {
+          final userId = state.pathParameters['id']!;
+          return PublicProfileScreen(userId: userId);
+        },
+      ),
+      
     ],
   );
 });

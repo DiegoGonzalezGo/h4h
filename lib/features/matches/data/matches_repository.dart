@@ -19,9 +19,10 @@ class MatchesRepository {
   }
 
 // Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
+ // Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
   Future<void> completeMatchAndRate(String matchId, String providerId, double rating) async {
     // 1. Cambiamos el estado del match a 'completed'
-    await _firestore.collection('matches').doc(matchId).update({'status': 'completed'});
+    await _firestore.collection('matches').doc(matchId).update({'status': 'completed', 'completedAt': FieldValue.serverTimestamp(), });
 
     // 2. Usamos una "Transacción" para leer y actualizar el perfil del proveedor de forma segura
     final providerRef = _firestore.collection('users').doc(providerId);
@@ -117,3 +118,17 @@ final clientMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
           .map((doc) => MatchModel.fromMap(doc.data(), doc.id))
           .toList());
 });
+// Proveedor para obtener los detalles de un match específico
+final matchDetailsProvider = StreamProvider.family<MatchModel?, String>((ref, matchId) {
+  return FirebaseFirestore.instance
+      .collection('matches')
+      .doc(matchId)
+      .snapshots()
+      .map((doc) => doc.exists ? MatchModel.fromMap(doc.data()!, doc.id) : null);
+});
+//cancelar un match
+Future<void> cancelMatch(String matchId) async {
+  await FirebaseFirestore.instance.collection('matches').doc(matchId).update({
+    'status': 'cancelled',
+  });
+}

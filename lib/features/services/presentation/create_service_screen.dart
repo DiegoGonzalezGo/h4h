@@ -14,7 +14,12 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
+  
+  String _selectedCategory = 'Tecnología';
   bool _isLoading = false;
+
+  // 1. FALTABA: La lista de categorías disponibles
+  final List<String> _categories = ['Tecnología', 'Educación', 'Hogar', 'Salud', 'General'];
 
   @override
   void dispose() {
@@ -32,18 +37,20 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
     try {
       final price = double.tryParse(_priceController.text) ?? 0.0;
       
-      // Llamamos a nuestro repositorio
+      // 2. FALTABA: Enviar la categoría seleccionada al repositorio
+      // Nota: Si tu repositorio usa parámetros posicionales, quita los nombres (title:, description:, etc.)
       await ref.read(servicesRepositoryProvider).createService(
-        title: _titleController.text.trim(),
-        description: _descController.text.trim(),
-        price: price,
+        _titleController.text.trim(),
+        _descController.text.trim(),
+        price,
+        _selectedCategory, // <-- Pasamos la categoría
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Servicio publicado con éxito ✅'), backgroundColor: Colors.green),
         );
-        context.pop(); // Regresamos a la pantalla anterior
+        context.pop(); 
       }
     } catch (e) {
       if (mounted) {
@@ -81,6 +88,28 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
               decoration: const InputDecoration(labelText: 'Precio (ej. 150.00)', prefixText: '\$'),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
+            const SizedBox(height: 16),
+            
+            // 3. FALTABA: El menú desplegable en la interfaz
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: 'Categoría',
+                border: OutlineInputBorder(),
+              ),
+              items: _categories.map((String category) {
+                return DropdownMenuItem<String>(
+                  value: category,
+                  child: Text(category),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedCategory = newValue!;
+                });
+              },
+            ),
+            
             const SizedBox(height: 32),
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
