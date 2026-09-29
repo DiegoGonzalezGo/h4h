@@ -10,7 +10,7 @@ class ClientMatchesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Escuchamos el proveedor de solicitudes del cliente
-    final matchesAsync = ref.watch(clientMatchesProvider);
+    final matchesAsync = ref.watch(clientActiveMatchesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mis Solicitudes Enviadas')),
@@ -61,14 +61,39 @@ class ClientMatchesScreen extends ConsumerWidget {
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: statusColor.withOpacity(0.2),
+                            backgroundColor: statusColor.withValues(alpha: 0.2),
                             child: Icon(statusIcon, color: statusColor),
                           ),
                           title: Text(serviceName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(
-                            statusText,
-                            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-                          ),
+                          subtitle: match.status == 'pending'
+                              ? Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Text(
+                                        'Pendiente',
+                                        style: TextStyle(color: Colors.orange),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextButton.icon(
+                                      onPressed: () => _showCancelDialog(context, match.id, ref),
+                                      icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                                      label: const Text(
+                                        'Cancelar',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  statusText,
+                                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+                                ),
                           // ... Aquí va toda tu lógica actual de los botones (trailing) ...
                           trailing: match.status == 'accepted'
                               ? Row(
@@ -99,15 +124,7 @@ class ClientMatchesScreen extends ConsumerWidget {
                                     ),
                                   ],
                                 )
-                              : (match.status == 'rejected' || match.status == 'completed')
-                                  ? IconButton(
-                                      icon: const Icon(Icons.close, color: Colors.grey),
-                                      tooltip: 'Limpiar registro',
-                                      onPressed: () {
-                                        ref.read(matchesRepositoryProvider).deleteMatch(match.id);
-                                      },
-                                    )
-                                  : null,
+                              : null,
                         ),
                       );
                     },
@@ -120,6 +137,44 @@ class ClientMatchesScreen extends ConsumerWidget {
     );
   }
 } 
+
+Future<void> _showCancelDialog(BuildContext context, String matchId, WidgetRef ref) async {
+  final shouldCancel = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Cancelar solicitud'),
+      content: const Text('¿Seguro que quieres cancelar esta solicitud?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('No'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Sí, cancelar'),
+        ),
+      ],
+    ),
+  );
+
+  if (shouldCancel == true) {
+    try {
+      await ref.read(matchesRepositoryProvider).cancelMatch(matchId);
+      ref.invalidate(clientActiveMatchesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Solicitud cancelada.')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo cancelar la solicitud: $error')),
+        );
+      }
+    }
+  }
+}
 
 // Widget personalizado para mostrar las 5 estrellas interactivas
 class RatingDialog extends StatefulWidget {

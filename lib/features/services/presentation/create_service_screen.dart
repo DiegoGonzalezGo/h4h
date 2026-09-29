@@ -92,7 +92,7 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
             
             // 3. FALTABA: El menú desplegable en la interfaz
             DropdownButtonFormField<String>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(
                 labelText: 'Categoría',
                 border: OutlineInputBorder(),

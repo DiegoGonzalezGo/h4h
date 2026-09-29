@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../data/services_repository.dart';
 import '../../matches/data/matches_repository.dart';
-import '../../notifications/notifications_service.dart';
 
 // Lo convertimos a Stateful para manejar el texto de búsqueda y la categoría seleccionada
 class ServicesFeedScreen extends ConsumerStatefulWidget {
@@ -21,10 +20,45 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
   @override
   void initState() {
     super.initState();
-    // Ejecutamos la configuración de notificaciones justo después de dibujar la pantalla
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(notificationsServiceProvider).initialize();
-    });
+  }
+
+  Future<void> _showCancelDialog(BuildContext context, String matchId) async {
+    final shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancelar servicio'),
+        content: const Text('¿Estás seguro de que deseas cancelar este servicio?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldCancel != true) return;
+
+    try {
+      await ref.read(matchesRepositoryProvider).cancelMatch(matchId);
+      ref.invalidate(clientActiveMatchesProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Servicio cancelado correctamente.')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo cancelar el servicio: $error')),
+        );
+      }
+    }
   }
 
   @override
@@ -124,16 +158,23 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                     
                     return Consumer(
                       builder: (context, ref, child) {
-                        final myMatches = ref.watch(clientMatchesProvider).value ?? [];
+                        final myMatches = (ref.watch(clientActiveMatchesProvider).value ?? [])
+                          .where((m) => m.status != 'cancelled')
+                          .toList();
                         final existingMatch = myMatches.where((m) => m.serviceId == service.id).firstOrNull;
                         final isRequested = existingMatch != null;
 
                         String buttonText = 'Solicitar Servicio';
                         if (isRequested) {
-                          if (existingMatch.status == 'pending') buttonText = 'Pendiente';
-                          else if (existingMatch.status == 'accepted') buttonText = 'Aceptada';
-                          else if (existingMatch.status == 'rejected') buttonText = 'Rechazada';
-                          else if (existingMatch.status == 'completed') buttonText = 'Completada';
+                          if (existingMatch.status == 'pending') {
+                            buttonText = 'Pendiente';
+                          } else if (existingMatch.status == 'accepted') {
+                            buttonText = 'Aceptada';
+                          } else if (existingMatch.status == 'rejected') {
+                            buttonText = 'Rechazada';
+                          } else if (existingMatch.status == 'completed') {
+                            buttonText = 'Completada';
+                          }
                         }
 
                         final providerProfileAsync = ref.watch(providerProfileProvider(service.providerId));
@@ -248,25 +289,41 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                 const SizedBox(height: 8),
                                 Align(
                                   alignment: Alignment.centerRight,
-                                  child: FilledButton.tonal(
-                                    onPressed: isRequested ? null : () async {
-                                      try {
-                                        await ref.read(matchesRepositoryProvider).requestService(
-                                          service.id,
-                                          service.providerId,
-                                        );
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(e.toString().replaceAll('Exception: ', '')), 
-                                              backgroundColor: Colors.red
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                    child: Text(buttonText),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      FilledButton.tonal(
+                                        onPressed: isRequested ? null : () async {
+                                          try {
+                                            await ref.read(matchesRepositoryProvider).requestService(
+                                              service.id,
+                                              service.providerId,
+                                            );
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(e.toString().replaceAll('Exception: ', '')),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        child: Text(buttonText),
+                                      ),
+                                      if (isRequested && existingMatch.status == 'pending') ...[
+                                        const SizedBox(width: 8),
+                                        TextButton.icon(
+                                          onPressed: () => _showCancelDialog(context, existingMatch.id),
+                                          icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                                          label: const Text(
+                                            'Cancelar',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 )
                               ],

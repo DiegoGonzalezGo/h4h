@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../users/data/user_model.dart'; // Importamos el modelo que definimos antes
+import '../../users/data/user_model.dart';
+
 
 class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;

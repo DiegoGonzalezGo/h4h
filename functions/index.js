@@ -1,11 +1,11 @@
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
 // 1. Notificar al Proveedor cuando llega una NUEVA SOLICITUD
 exports.notifyNewRequest = functions.firestore
     .document('matches/{matchId}')
-    .onCreate(async (snap, context) => {
+    .onCreate(async (snap) => {
         const matchData = snap.data();
         const providerId = matchData.providerId;
         const clientName = matchData.clientName || 'Un cliente';
@@ -28,7 +28,7 @@ exports.notifyNewRequest = functions.firestore
 // 2. Notificar al Cliente cuando se ACEPTA o RECHAZA la solicitud
 exports.notifyMatchStatus = functions.firestore
     .document('matches/{matchId}')
-    .onUpdate(async (change, context) => {
+    .onUpdate(async (change) => {
         const before = change.before.data();
         const after = change.after.data();
 
@@ -73,22 +73,55 @@ exports.notifyNewChatMessage = functions.firestore
 
         // Obtener la información del Match para saber quién es la otra persona
         const matchDoc = await admin.firestore().collection('matches').doc(matchId).get();
+        if (!matchDoc.exists) return null;
         const matchData = matchDoc.data();
+        if (!matchData || !matchData.clientId || !matchData.providerId) return null;
 
         // Determinar quién debe recibir el mensaje
         const receiverId = matchData.clientId === senderId ? matchData.providerId : matchData.clientId;
 
         // Obtener el fcmToken del receptor
         const receiverDoc = await admin.firestore().collection('users').doc(receiverId).get();
-        const fcmToken = receiverDoc.data().fcmToken;
+        if (!receiverDoc.exists) return null;
+        const fcmToken = receiverDoc.data()?.fcmToken;
 
         if (!fcmToken) return null;
+
+        const messageText = typeof text === 'string' ? text : '';
 
         return admin.messaging().send({
             token: fcmToken,
             notification: {
                 title: 'Nuevo mensaje',
-                body: text.length > 30 ? text.substring(0, 30) + '...' : text, // Trunca el mensaje si es muy largo
-            }
+                body: messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText,
+            },
+            data: {
+                type: 'chat_message',
+                matchId,
+            },
         });
+    });
+
+// Bloquear automáticamente a un usuario al alcanzar tres reportes.
+exports.autoBanReportedUser = functions.firestore
+    .document('reports/{reportId}')
+    .onCreate(async (snap) => {
+        const reportData = snap.data();
+        const reportedUserId = reportData.reportedUserId;
+
+        if (!reportedUserId) return null;
+
+        const reportsSnapshot = await admin.firestore()
+            .collection('reports')
+            .where('reportedUserId', '==', reportedUserId)
+            .get();
+
+        if (reportsSnapshot.size < 3) return null;
+
+        await admin.firestore()
+            .collection('users')
+            .doc(reportedUserId)
+            .update({ isBanned: true });
+
+        return null;
     });

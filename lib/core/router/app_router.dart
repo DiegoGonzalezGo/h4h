@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/services/presentation/services_feed_screen.dart';
 import '../../features/auth/data/auth_repository.dart'; // Importamos el espía que acabamos de crear
@@ -9,20 +10,22 @@ import '../../features/matches/presentation/provider_matches_screen.dart';
 import '../../features/services/presentation/my_services_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/matches/presentation/client_matches_screen.dart';
-import '../../features/matches/presentation/client_history_screen.dart';
+import '../../features/matches/presentation/history_screen.dart';
 import '../../features/services/presentation/top_providers_screen.dart';
 import '../../features/users/presentation/edit_profile_screen.dart';
 import '../../features/users/presentation/public_profile_screen.dart';
+import '../../features/users/data/user_repository.dart';
+import '../../features/auth/presentation/banned_screen.dart';
 
 // Convertimos el enrutador en un Provider
 final goRouterProvider = Provider<GoRouter>((ref) {
-  
   // 1. Riverpod vigila el estado de Firebase Auth en tiempo real
   final authState = ref.watch(authStateProvider);
+  final currentUserData = ref.watch(currentUserStreamProvider);
 
   return GoRouter(
     initialLocation: '/login',
-    
+
     // 2. El redirect se ejecuta mágicamente CADA VEZ que el authState cambia
     redirect: (context, state) {
       // Si Firebase todavía está pensando, no hacemos nada
@@ -30,12 +33,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       final isAuthenticated = authState.value != null;
       final isGoingToLogin = state.matchedLocation == '/login';
+      final isGoingToBanned = state.matchedLocation == '/banned';
+
+      if (isAuthenticated && currentUserData.hasValue) {
+        final isBanned = currentUserData.value?['isBanned'] == true;
+        if (isBanned && !isGoingToBanned) {
+          return '/banned';
+        }
+      }
 
       // Regla A: Si NO está logueado y trata de entrar al feed (o a otra ruta) -> Bloquear y enviar al Login
       if (!isAuthenticated && !isGoingToLogin) {
         return '/login';
       }
-      
+
       // Regla B: Si SÍ está logueado y por error abre la pantalla de Login -> Enviar directo al Feed
       if (isAuthenticated && isGoingToLogin) {
         return '/feed';
@@ -45,9 +56,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        path: '/banned',
+        builder: (context, state) => const BannedScreen(),
       ),
       GoRoute(
         path: '/feed',
@@ -80,22 +92,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/client-matches',
         builder: (context, state) => const ClientMatchesScreen(),
       ),
-      GoRoute(
-        path: '/',
-        redirect: (context, state) => '/feed',
-      ),
-      // Tus rutas actuales se quedan exactamente igual
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/feed',
-        builder: (context, state) => const ServicesFeedScreen(),
-      ),
+      GoRoute(path: '/', redirect: (context, state) => '/feed'),
       GoRoute(
         path: '/client-history',
-        builder: (context, state) => const ClientHistoryScreen(),
+        builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: '/history',
+        builder: (context, state) => const HistoryScreen(),
       ),
       GoRoute(
         path: '/ranking',
@@ -112,7 +116,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return PublicProfileScreen(userId: userId);
         },
       ),
-      
     ],
   );
 });

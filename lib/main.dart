@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // 1. Importación para el gestor de estado
 
 import 'firebase_options.dart';
 import 'core/router/app_router.dart'; // 2. Importación para que reconozca "appRouter"
+import 'features/notifications/notifications_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  
+
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  final notificationsService = NotificationsService();
+  await notificationsService.initialize();
+
   // 3. Envolvemos MyApp en ProviderScope para poder usar Riverpod en toda la aplicación
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        notificationsServiceProvider.overrideWithValue(notificationsService),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 // Cambiamos StatelessWidget por ConsumerWidget para que pueda leer a Riverpod

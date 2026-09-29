@@ -68,7 +68,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(userRepositoryProvider).updateProfile(
-        _userId!, 
+        _userId,
         _nameController.text, 
         _bioController.text,
         _selectedImage,

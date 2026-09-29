@@ -1,65 +1,122 @@
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// Proveedor para acceder fácilmente a este servicio desde cualquier parte
-final notificationsServiceProvider = Provider((ref) => NotificationsService());
+import '../../firebase_options.dart';
+
+final notificationsServiceProvider = Provider<NotificationsService>(
+  (ref) => NotificationsService(),
+);
+
+const _androidChannel = AndroidNotificationChannel(
+  'chat_messages',
+  'Mensajes del chat',
+  description: 'Notificaciones de nuevos mensajes del chat.',
+  importance: Importance.max,
+);
+
+final FlutterLocalNotificationsPlugin _localNotifications =
+    FlutterLocalNotificationsPlugin();
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+}
 
 class NotificationsService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _initialized = false;
 
-  // Función principal para inicializar las notificaciones
   Future<void> initialize() async {
-    // 1. Pedir permiso al usuario (necesario en iOS y Android 13+)
-    NotificationSettings settings = await _messaging.requestPermission(
+    if (_initialized) return;
+    _initialized = true;
+
+    await _localNotifications.initialize(
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(),
+      ),
+    );
+
+    final androidNotifications = _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidNotifications?.createNotificationChannel(_androidChannel);
+    await androidNotifications?.requestNotificationsPermission();
+
+    final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print(' Permiso de notificaciones concedido');
-      await _saveDeviceToken();
+      debugPrint('Permiso de notificaciones concedido');
+      await _saveDeviceToken(_auth.currentUser);
     } else {
-      print(' Permiso de notificaciones denegado');
+      debugPrint('Permiso de notificaciones denegado');
     }
 
-    // 2. Escuchar cuando la app está abierta y llega un mensaje
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print(' Notificación recibida en primer plano: ${message.notification?.title}');
-      // Aquí más adelante podemos mostrar una alerta visual dentro de la app
+    _auth.authStateChanges().listen(_saveDeviceToken);
+    _messaging.onTokenRefresh.listen((token) async {
+      final user = _auth.currentUser;
+      if (user != null) await _saveToken(user, token);
     });
+    FirebaseMessaging.onMessage.listen(_showForegroundNotification);
   }
 
-  // Función para obtener el Token del teléfono y guardarlo en el perfil del usuario
-  Future<void> _saveDeviceToken() async {
-    final user = _auth.currentUser;
+  Future<void> _saveDeviceToken(User? user) async {
     if (user == null) return;
 
     try {
-      // Obtenemos el token único de este dispositivo
-      String? token = await _messaging.getToken();
-      
-      if (token != null) {
-        // Lo guardamos en el documento del usuario en Firestore
-        await _firestore.collection('users').doc(user.uid).update({
-          'fcmToken': token,
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        });
-        print(' Token guardado en Firestore: $token');
-      }
-
-      // Si el token cambia (por ejemplo, al reinstalar la app), lo actualizamos
-      _messaging.onTokenRefresh.listen((newToken) {
-        _firestore.collection('users').doc(user.uid).update({
-          'fcmToken': newToken,
-        });
-      });
-    } catch (e) {
-      print('Error al guardar el token: $e');
+      final token = await _messaging.getToken();
+      if (token != null) await _saveToken(user, token);
+    } catch (error) {
+      debugPrint('Error al guardar el token FCM: $error');
     }
+  }
+
+  Future<void> _saveToken(User user, String token) async {
+    await _firestore.collection('users').doc(user.uid).set({
+      'fcmToken': token,
+      'lastTokenUpdate': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    debugPrint('Token FCM guardado para ${user.uid}');
+  }
+
+  Future<void> _showForegroundNotification(RemoteMessage message) async {
+    final notification = message.notification;
+    final title = notification?.title ?? message.data['title'] as String?;
+    final body = notification?.body ?? message.data['body'] as String?;
+    if (title == null && body == null) return;
+
+    await _localNotifications.show(
+      message.messageId.hashCode,
+      title ?? 'Hand4Hand',
+      body ?? '',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'chat_messages',
+          'Mensajes del chat',
+          channelDescription: 'Notificaciones de nuevos mensajes del chat.',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+    );
   }
 }

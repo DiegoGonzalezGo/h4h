@@ -9,6 +9,7 @@ class MatchModel {
   final String providerId;
   final String status;
   final DateTime? completedAt;
+  final double? rating;
 
 // Constructor
   MatchModel({
@@ -19,6 +20,7 @@ class MatchModel {
     required this.providerId,
     this.status = 'pending',
     this.completedAt,
+    this.rating,
   });
 
   factory MatchModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -32,6 +34,7 @@ class MatchModel {
       completedAt: map['completedAt'] != null 
           ? (map['completedAt'] as Timestamp).toDate() 
           : null,
+        rating: (map['rating'] as num?)?.toDouble(),
     );
   }
 
@@ -42,6 +45,7 @@ class MatchModel {
       'clientName': clientName, // <-- NUEVO
       'providerId': providerId,
       'status': status,
+      if (rating != null) 'rating': rating,
     };
   }
 }

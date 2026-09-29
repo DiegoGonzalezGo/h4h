@@ -9,7 +9,7 @@ class ProviderMatchesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Escuchamos la lista de solicitudes en tiempo real
-    final matchesAsync = ref.watch(providerMatchesProvider);
+    final matchesAsync = ref.watch(providerActiveMatchesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Solicitudes Recibidas')),

@@ -8,7 +8,7 @@ class ClientHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final matchesAsync = ref.watch(clientMatchesProvider);
+    final matchesAsync = ref.watch(clientHistoryMatchesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Historial de Servicios')),
@@ -16,8 +16,7 @@ class ClientHistoryScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, stack) => Center(child: Text('Error: $e')),
         data: (matches) {
-          // Filtramos SOLO los que están completados
-          final historyMatches = matches.where((m) => m.status == 'completed').toList();
+          final historyMatches = matches;
 
           if (historyMatches.isEmpty) {
             return const Center(child: Text('Aún no tienes servicios finalizados en tu historial.'));

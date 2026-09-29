@@ -50,7 +50,7 @@ class MyServicesScreen extends ConsumerWidget {
                         // Interruptor para encender/apagar el servicio
                         Switch(
                           value: service.isActive,
-                          activeColor: Colors.green,
+                          activeThumbColor: Colors.green,
                           onChanged: (newValue) {
                             ref.read(servicesRepositoryProvider).toggleServiceStatus(service.id, service.isActive);
                           },

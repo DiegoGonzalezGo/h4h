@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../data/chat_repository.dart';
 import '../../matches/data/matches_repository.dart';
+import '../../users/presentation/report_user_menu.dart';
+
 import 'package:go_router/go_router.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -20,7 +23,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _sendMessage() {
     if (_controller.text.isNotEmpty) {
-      ref.read(chatRepositoryProvider).sendMessage(widget.matchId, _controller.text);
+      ref
+          .read(chatRepositoryProvider)
+          .sendMessage(widget.matchId, _controller.text);
       _controller.clear();
     }
   }
@@ -31,7 +36,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messagesAsync = ref.watch(chatMessagesProvider(widget.matchId));
 
     // ASUMIENDO QUE TIENES ESTAS VARIABLES EN TU BUILD:
-    final matchAsync = ref.watch(matchDetailsProvider(widget.matchId)); // Reemplaza widget.matchId con tu variable
+    final matchAsync = ref.watch(
+      matchDetailsProvider(widget.matchId),
+    ); // Reemplaza widget.matchId con tu variable
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
@@ -48,8 +55,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 : match.clientId;
 
             // Muestra el nombre genérico basado en el rol (opcionalmente podrías buscar el nombre real)
-            final String otherUserName = match.clientId == currentUserId 
-                ? 'Proveedor' 
+            final String otherUserName = match.clientId == currentUserId
+                ? 'Proveedor'
                 : match.clientName;
 
             // --- NUEVO: ENVOLVEMOS EL TÍTULO EN UN GestureDetector ---
@@ -71,7 +78,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             // ---------------------------------------------------------
           },
           loading: () => const Text('Cargando...'),
-          error: (_, __) => const Text('Chat'),
+          error: (_, _) => const Text('Chat'),
+        ),
+        actions: matchAsync.when(
+          data: (match) {
+            if (match == null || currentUserId == null) {
+              return const <Widget>[];
+            }
+
+            final reportedUserId = match.clientId == currentUserId
+                ? match.providerId
+                : match.clientId;
+
+            return [ReportUserMenu(reportedUserId: reportedUserId)];
+          },
+          loading: () => const <Widget>[],
+          error: (_, _) => const <Widget>[],
         ),
       ),
       body: Column(
@@ -82,7 +104,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               error: (e, stack) => Center(child: Text('Error: $e')),
               data: (messages) {
                 if (messages.isEmpty) {
-                  return const Center(child: Text('Escribe el primer mensaje...'));
+                  return const Center(
+                    child: Text('Escribe el primer mensaje...'),
+                  );
                 }
 
                 return ListView.builder(
@@ -90,15 +114,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
-                    final isMe = msg.senderId == currentUserId; // Verificamos si yo lo envié
+                    final isMe =
+                        msg.senderId ==
+                        currentUserId; // Verificamos si yo lo envié
 
                     return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isMe
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                        margin: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 12,
+                        ),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isMe ? Colors.blue.shade100 : Colors.grey.shade200,
+                          color: isMe
+                              ? Colors.blue.shade100
+                              : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(16).copyWith(
                             bottomRight: isMe ? const Radius.circular(0) : null,
                             bottomLeft: !isMe ? const Radius.circular(0) : null,
@@ -123,8 +156,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     controller: _controller,
                     decoration: InputDecoration(
                       hintText: 'Escribe un mensaje...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -135,10 +172,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     icon: const Icon(Icons.send, color: Colors.white),
                     onPressed: _sendMessage,
                   ),
-                )
+                ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );

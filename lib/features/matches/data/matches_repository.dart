@@ -22,7 +22,11 @@ class MatchesRepository {
  // Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
   Future<void> completeMatchAndRate(String matchId, String providerId, double rating) async {
     // 1. Cambiamos el estado del match a 'completed'
-    await _firestore.collection('matches').doc(matchId).update({'status': 'completed', 'completedAt': FieldValue.serverTimestamp(), });
+    await _firestore.collection('matches').doc(matchId).update({
+      'status': 'completed',
+      'completedAt': FieldValue.serverTimestamp(),
+      'rating': rating,
+    });
 
     // 2. Usamos una "Transacción" para leer y actualizar el perfil del proveedor de forma segura
     final providerRef = _firestore.collection('users').doc(providerId);
@@ -62,7 +66,11 @@ Future<void> requestService(String serviceId, String providerId) async {
         .where('serviceId', isEqualTo: serviceId)
         .get();
 
-    if (existingMatch.docs.isNotEmpty) {
+    final activeMatchExists = existingMatch.docs.any(
+      (doc) => doc.data()['status'] != 'cancelled',
+    );
+
+    if (activeMatchExists) {
       throw Exception('Ya has solicitado este servicio previamente.');
     }
 
@@ -82,41 +90,75 @@ Future<void> requestService(String serviceId, String providerId) async {
 
     await docRef.set(newMatch.toMap());
   }
+
+  Future<void> cancelMatch(String matchId) async {
+    await _firestore.collection('matches').doc(matchId).update({
+      'status': 'cancelled',
+    });
+  }
 } // <--- Aquí cierra correctamente la clase MatchesRepository
 
 // Exponemos el repositorio para usarlo en la UI
 final matchesRepositoryProvider = Provider<MatchesRepository>((ref) => MatchesRepository());
 
 // Este proveedor escucha en tiempo real las solicitudes donde YO soy el proveedor
-final providerMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final user = authState.value;
-
-  if (user == null) return const Stream.empty(); 
-
+Stream<List<MatchModel>> _matchesForUser(
+  String field,
+  String userId,
+  List<String> statuses,
+) {
   return FirebaseFirestore.instance
       .collection('matches')
-      .where('providerId', isEqualTo: user.uid)
+      .where(field, isEqualTo: userId)
+      .where('status', whereIn: statuses)
       .snapshots()
       .map((snapshot) => snapshot.docs
           .map((doc) => MatchModel.fromMap(doc.data(), doc.id))
           .toList());
-});
+}
 
-// Este proveedor escucha en tiempo real las solicitudes donde YO soy el cliente
-final clientMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
+final providerActiveMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
   final authState = ref.watch(authStateProvider);
   final user = authState.value;
 
   if (user == null) return const Stream.empty();
 
-  return FirebaseFirestore.instance
-      .collection('matches')
-      .where('clientId', isEqualTo: user.uid)
-      .snapshots()
-      .map((snapshot) => snapshot.docs
-          .map((doc) => MatchModel.fromMap(doc.data(), doc.id))
-          .toList());
+  return _matchesForUser('providerId', user.uid, ['pending', 'accepted']);
+});
+
+final providerHistoryMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
+
+  if (user == null) return const Stream.empty();
+
+  return _matchesForUser(
+    'providerId',
+    user.uid,
+    ['completed', 'rejected', 'cancelled'],
+  );
+});
+
+final clientActiveMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
+
+  if (user == null) return const Stream.empty();
+
+  return _matchesForUser('clientId', user.uid, ['pending', 'accepted']);
+});
+
+final clientHistoryMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
+
+  if (user == null) return const Stream.empty();
+
+  return _matchesForUser(
+    'clientId',
+    user.uid,
+    ['completed', 'rejected', 'cancelled'],
+  );
 });
 // Proveedor para obtener los detalles de un match específico
 final matchDetailsProvider = StreamProvider.family<MatchModel?, String>((ref, matchId) {
@@ -126,9 +168,3 @@ final matchDetailsProvider = StreamProvider.family<MatchModel?, String>((ref, ma
       .snapshots()
       .map((doc) => doc.exists ? MatchModel.fromMap(doc.data()!, doc.id) : null);
 });
-//cancelar un match
-Future<void> cancelMatch(String matchId) async {
-  await FirebaseFirestore.instance.collection('matches').doc(matchId).update({
-    'status': 'cancelled',
-  });
-}

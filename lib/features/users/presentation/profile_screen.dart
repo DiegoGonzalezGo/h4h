@@ -4,18 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/user_repository.dart';
-
-// 1. CORRECCIÓN: Usamos la estructura moderna NotifierProvider
-class ProviderMode extends Notifier<bool> {
-  @override
-  bool build() => false; 
-
-  void toggleMode(bool isProvider) {
-    state = isProvider;
-  }
-}
-
-final providerModeProvider = NotifierProvider<ProviderMode, bool>(ProviderMode.new);
+import '../data/provider_mode.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -86,7 +75,6 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                       ),
                     const SizedBox(height: 8),
-                    const SizedBox(height: 8),
                     TextButton.icon(
                       icon: const Icon(Icons.edit, size: 18),
                       label: const Text('Editar perfil'),
@@ -107,8 +95,14 @@ class ProfileScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
               child: SwitchListTile(
-                title: const Text('Modo Proveedor'),
-                subtitle: const Text('Activa para ofrecer servicios'),
+                title: Text(
+                  isProviderMode ? 'Modo Proveedor' : 'Modo Cliente',
+                ),
+                subtitle: Text(
+                  isProviderMode
+                      ? 'Activa para ofrecer servicios'
+                      : 'Activa para buscar y solicitar servicios',
+                ),
                 value: isProviderMode,
                 onChanged: (value) {
                   // 2. CORRECCIÓN: Llamamos a la nueva función toggleMode
@@ -152,6 +146,12 @@ class ProfileScreen extends ConsumerWidget {
           onTap: () {
             context.push('/provider-matches');
           },
+        ),
+        ListTile(
+          leading: const Icon(Icons.history),
+          title: const Text('Historial de servicios'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/history'),
         ),
       ],
     );
