@@ -11,6 +11,7 @@ import 'address_model.dart';
 final userRepositoryProvider = Provider((ref) => UserRepository());
 
 // Escucha en tiempo real las direcciones guardadas del usuario actual
+// (subcolección users/{uid}/addresses)
 final currentUserAddressesProvider = StreamProvider<List<AddressModel>>((ref) {
   final authState = ref.watch(authStateProvider);
   final user = authState.value;
@@ -22,8 +23,15 @@ final currentUserAddressesProvider = StreamProvider<List<AddressModel>>((ref) {
   return FirebaseFirestore.instance
       .collection('users')
       .doc(user.uid)
+      .collection('addresses')
       .snapshots()
-      .map((doc) => AddressModel.listFromUserData(doc.data()));
+      .map(
+        (snapshot) => snapshot.docs
+            .map(
+              (doc) => AddressModel.fromMap({...doc.data(), 'id': doc.id}),
+            )
+            .toList(),
+      );
 });
 
 // Proveedor para escuchar los cambios del perfil en tiempo real (como la nueva foto)
@@ -74,11 +82,14 @@ class UserRepository {
     }
   }
 
-  // Agrega una dirección al arreglo 'addresses' del documento del usuario
+  // Agrega una dirección a la subcolección users/{uid}/addresses
   Future<void> addAddress(String userId, AddressModel address) async {
-    await _firestore.collection('users').doc(userId).update({
-      'addresses': FieldValue.arrayUnion([address.toMap()]),
-    });
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('addresses')
+        .doc(address.id)
+        .set(address.toMap());
   }
 
   // 1. CORRECCIÓN: Agregamos "String bio" a los parámetros

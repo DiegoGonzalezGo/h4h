@@ -35,16 +35,4 @@ class AddressModel {
       'reference': reference,
     };
   }
-
-  // Las direcciones viven como un arreglo de mapas en el campo 'addresses'
-  // del documento users/{uid}
-  static List<AddressModel> listFromUserData(Map<String, dynamic>? data) {
-    if (data == null) return const [];
-    final raw = data['addresses'];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((e) => AddressModel.fromMap(Map<String, dynamic>.from(e)))
-        .toList();
-  }
 }

@@ -49,15 +49,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
 
     try {
-      await Future.delayed(const Duration(seconds: 3));
-
-      await ref
-          .read(matchesRepositoryProvider)
-          .requestPaidService(
-            service: widget.service,
-            address: widget.selectedAddress,
-            paymentMethod: _simulatedPaymentMethod,
-          );
+      // La espera simulada y el guardado en Firestore corren en paralelo
+      await Future.wait([
+        Future.delayed(const Duration(seconds: 3)),
+        ref
+            .read(matchesRepositoryProvider)
+            .requestPaidService(
+              service: widget.service,
+              address: widget.selectedAddress,
+              paymentMethod: _simulatedPaymentMethod,
+            ),
+      ]);
     } catch (e) {
       dialogNavigator.pop();
       if (!themedContext.mounted) return;
