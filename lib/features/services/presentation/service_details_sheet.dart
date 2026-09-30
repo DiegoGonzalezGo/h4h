@@ -21,6 +21,7 @@ class ServiceDetailsSheet extends ConsumerStatefulWidget {
 class _ServiceDetailsSheetState extends ConsumerState<ServiceDetailsSheet> {
   AddressModel? selectedAddress;
   bool _showAddressError = false;
+  bool _addressSaveError = false;
 
   Future<void> _showAddAddressDialog() async {
     final labelController = TextEditingController();
@@ -98,17 +99,34 @@ class _ServiceDetailsSheetState extends ConsumerState<ServiceDetailsSheet> {
       ),
     );
 
+    for (final controller in [
+      labelController,
+      streetController,
+      cityController,
+      referenceController,
+    ]) {
+      controller.dispose();
+    }
+
     if (newAddress == null) return;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    await ref.read(userRepositoryProvider).addAddress(user.uid, newAddress);
+    try {
+      await ref.read(userRepositoryProvider).addAddress(user.uid, newAddress);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _addressSaveError = true);
+      }
+      return;
+    }
 
     if (mounted) {
       setState(() {
         selectedAddress = newAddress;
         _showAddressError = false;
+        _addressSaveError = false;
       });
     }
   }
@@ -203,6 +221,7 @@ class _ServiceDetailsSheetState extends ConsumerState<ServiceDetailsSheet> {
                           setState(() {
                             selectedAddress = address;
                             _showAddressError = false;
+                            _addressSaveError = false;
                           });
                         },
                       );
@@ -215,6 +234,14 @@ class _ServiceDetailsSheetState extends ConsumerState<ServiceDetailsSheet> {
                 icon: const Icon(Icons.add),
                 label: const Text('Agregar dirección'),
               ),
+              if (_addressSaveError)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'No se pudo guardar la dirección.',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
               if (_showAddressError)
                 const Padding(
                   padding: EdgeInsets.only(top: 4),

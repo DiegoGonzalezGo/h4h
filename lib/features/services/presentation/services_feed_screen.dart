@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../data/services_repository.dart';
 import '../../matches/data/matches_repository.dart';
 import 'service_details_sheet.dart';
@@ -17,14 +16,7 @@ class ServicesFeedScreen extends ConsumerStatefulWidget {
 class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
   String _searchQuery = '';
   String _selectedCategory = 'Todas';
-  final List<String> _categories = [
-    'Todas',
-    'Tecnología',
-    'Educación',
-    'Hogar',
-    'Salud',
-    'General',
-  ];
+  final List<String> _categories = ['Todas', 'Tecnología', 'Educación', 'Hogar', 'Salud', 'General'];
 
   @override
   void initState() {
@@ -36,9 +28,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Cancelar servicio'),
-        content: const Text(
-          '¿Estás seguro de que deseas cancelar este servicio?',
-        ),
+        content: const Text('¿Estás seguro de que deseas cancelar este servicio?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -74,7 +64,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final servicesAsync = ref.watch(activeServicesProvider);
+    final servicesAsync = ref.watch(activeServicesProvider); 
 
     return Scaffold(
       appBar: AppBar(
@@ -84,7 +74,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
             icon: const Icon(Icons.emoji_events, color: Colors.amber, size: 28),
             tooltip: 'Top Proveedores',
             onPressed: () {
-              context.push('/ranking');
+              context.push('/ranking'); 
             },
           ),
           IconButton(
@@ -105,9 +95,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               decoration: InputDecoration(
                 hintText: 'Buscar servicios...',
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               ),
               onChanged: (value) {
@@ -115,7 +103,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               },
             ),
           ),
-
+          
           // 2. FILTRO DE CATEGORÍAS (Píldoras deslizables)
           SizedBox(
             height: 40,
@@ -126,16 +114,14 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               itemBuilder: (context, index) {
                 final category = _categories[index];
                 final isSelected = category == _selectedCategory;
-
+                
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: ChoiceChip(
                     label: Text(category),
                     selected: isSelected,
                     onSelected: (selected) {
-                      if (selected) {
-                        setState(() => _selectedCategory = category);
-                      }
+                      if (selected) setState(() => _selectedCategory = category);
                     },
                   ),
                 );
@@ -153,21 +139,16 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                 // AQUÍ APLICAMOS EL FILTRO EN TIEMPO REAL
                 final filteredServices = services.where((service) {
                   // Filtro por texto
-                  final matchesSearch =
-                      service.title.toLowerCase().contains(_searchQuery) ||
-                      service.description.toLowerCase().contains(_searchQuery);
+                  final matchesSearch = service.title.toLowerCase().contains(_searchQuery) ||
+                                      service.description.toLowerCase().contains(_searchQuery);
                   // Filtro por categoría
-                  final matchesCategory =
-                      _selectedCategory == 'Todas' ||
-                      service.category == _selectedCategory;
-
+                  final matchesCategory = _selectedCategory == 'Todas' || service.category == _selectedCategory;
+                  
                   return matchesSearch && matchesCategory;
                 }).toList();
 
                 if (filteredServices.isEmpty) {
-                  return const Center(
-                    child: Text('No se encontraron servicios.'),
-                  );
+                  return const Center(child: Text('No se encontraron servicios.'));
                 }
 
                 return ListView.builder(
@@ -175,16 +156,13 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                   itemCount: filteredServices.length,
                   itemBuilder: (context, index) {
                     final service = filteredServices[index];
-
+                    
                     return Consumer(
                       builder: (context, ref, child) {
-                        final myMatches =
-                            (ref.watch(clientActiveMatchesProvider).value ?? [])
-                                .where((m) => m.status != 'cancelled')
-                                .toList();
-                        final existingMatch = myMatches
-                            .where((m) => m.serviceId == service.id)
-                            .firstOrNull;
+                        final myMatches = (ref.watch(clientActiveMatchesProvider).value ?? [])
+                          .where((m) => m.status != 'cancelled')
+                          .toList();
+                        final existingMatch = myMatches.where((m) => m.serviceId == service.id).firstOrNull;
                         final isRequested = existingMatch != null;
 
                         String buttonText = 'Solicitar Servicio';
@@ -200,9 +178,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                           }
                         }
 
-                        final providerProfileAsync = ref.watch(
-                          providerProfileProvider(service.providerId),
-                        );
+                        final providerProfileAsync = ref.watch(providerProfileProvider(service.providerId));
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -213,22 +189,16 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Text(
                                         service.title,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleLarge,
+                                        style: Theme.of(context).textTheme.titleLarge,
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
                                         color: Colors.blue.shade100,
                                         borderRadius: BorderRadius.circular(20),
@@ -243,34 +213,23 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                     ),
                                   ],
                                 ),
-
+                                
                                 providerProfileAsync.when(
                                   data: (data) {
-                                    final int reviews =
-                                        data['totalReviews'] ?? 0;
-                                    final double rating =
-                                        (data['averageRating'] ?? 0.0)
-                                            .toDouble();
-
+                                    final int reviews = data['totalReviews'] ?? 0;
+                                    final double rating = (data['averageRating'] ?? 0.0).toDouble();
+                                    
                                     if (reviews == 0) {
                                       // ENVOLVEMOS EN InkWell EL CASO SIN RESEÑAS
                                       return InkWell(
                                         onTap: () {
-                                          context.push(
-                                            '/user/${service.providerId}',
-                                          );
+                                          context.push('/user/${service.providerId}');
                                         },
                                         child: const Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 4.0,
-                                          ),
+                                          padding: EdgeInsets.symmetric(vertical: 4.0),
                                           child: Text(
-                                            'Nuevo proveedor (Sin calificaciones) - Toca para ver perfil',
-                                            style: TextStyle(
-                                              color: Colors.blueGrey,
-                                              fontSize: 12,
-                                              fontStyle: FontStyle.italic,
-                                            ),
+                                            'Nuevo proveedor (Sin calificaciones) - Toca para ver perfil', 
+                                            style: TextStyle(color: Colors.blueGrey, fontSize: 12, fontStyle: FontStyle.italic)
                                           ),
                                         ),
                                       );
@@ -279,53 +238,28 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                     // ENVOLVEMOS EN InkWell EL CASO CON ESTRELLAS
                                     return InkWell(
                                       onTap: () {
-                                        context.push(
-                                          '/user/${service.providerId}',
-                                        );
+                                        context.push('/user/${service.providerId}');
                                       },
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 4.0,
-                                        ),
+                                        padding: const EdgeInsets.symmetric(vertical: 4.0),
                                         child: Row(
                                           children: [
                                             // Agregamos un pequeño ícono para indicar que es clickeable
-                                            const Icon(
-                                              Icons.account_circle,
-                                              size: 16,
-                                              color: Colors.blue,
-                                            ),
+                                            const Icon(Icons.account_circle, size: 16, color: Colors.blue),
                                             const SizedBox(width: 4),
-                                            const Text(
-                                              'Ver perfil',
-                                              style: TextStyle(
-                                                color: Colors.blue,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
+                                            const Text('Ver perfil', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
                                             const SizedBox(width: 12),
-
+                                            
                                             // Tus estrellas originales
-                                            const Icon(
-                                              Icons.star,
-                                              color: Colors.amber,
-                                              size: 20,
-                                            ),
+                                            const Icon(Icons.star, color: Colors.amber, size: 20),
                                             const SizedBox(width: 4),
                                             Text(
                                               rating.toStringAsFixed(1),
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                             ),
                                             Text(
                                               ' ($reviews reseñas)',
-                                              style: TextStyle(
-                                                color: Colors.grey.shade600,
-                                                fontSize: 12,
-                                              ),
+                                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                                             ),
                                           ],
                                         ),
@@ -333,16 +267,8 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                     );
                                   },
                                   loading: () => const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 4.0,
-                                    ),
-                                    child: SizedBox(
-                                      height: 15,
-                                      width: 15,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
+                                    padding: EdgeInsets.symmetric(vertical: 4.0),
+                                    child: SizedBox(height: 15, width: 15, child: CircularProgressIndicator(strokeWidth: 2)),
                                   ),
                                   error: (e, stack) => const SizedBox.shrink(),
                                 ),
@@ -350,18 +276,14 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                 const SizedBox(height: 8),
                                 Text(
                                   service.description,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(color: Colors.grey.shade700),
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 // Etiqueta visual de la categoría en la tarjeta
                                 const SizedBox(height: 8),
                                 Chip(
-                                  label: Text(
-                                    service.category,
-                                    style: const TextStyle(fontSize: 10),
-                                  ),
+                                  label: Text(service.category, style: const TextStyle(fontSize: 10)),
                                   visualDensity: VisualDensity.compact,
                                   backgroundColor: Colors.grey.shade200,
                                 ),
@@ -372,34 +294,21 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       FilledButton.tonal(
-                                        onPressed: isRequested
-                                            ? null
-                                            : () {
-                                                showModalBottomSheet(
-                                                  context: context,
-                                                  isScrollControlled: true,
-                                                  useSafeArea: true,
-                                                  builder: (_) =>
-                                                      ServiceDetailsSheet(
-                                                        service: service,
-                                                      ),
-                                                );
-                                              },
+                                        onPressed: isRequested ? null : () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            useSafeArea: true,
+                                            builder: (_) => ServiceDetailsSheet(service: service),
+                                          );
+                                        },
                                         child: Text(buttonText),
                                       ),
-                                      if (isRequested &&
-                                          existingMatch.status ==
-                                              'pending') ...[
+                                      if (isRequested && existingMatch.status == 'pending') ...[
                                         const SizedBox(width: 8),
                                         TextButton.icon(
-                                          onPressed: () => _showCancelDialog(
-                                            context,
-                                            existingMatch.id,
-                                          ),
-                                          icon: const Icon(
-                                            Icons.cancel_outlined,
-                                            color: Colors.red,
-                                          ),
+                                          onPressed: () => _showCancelDialog(context, existingMatch.id),
+                                          icon: const Icon(Icons.cancel_outlined, color: Colors.red),
                                           label: const Text(
                                             'Cancelar',
                                             style: TextStyle(color: Colors.red),
@@ -408,7 +317,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                       ],
                                     ],
                                   ),
-                                ),
+                                )
                               ],
                             ),
                           ),

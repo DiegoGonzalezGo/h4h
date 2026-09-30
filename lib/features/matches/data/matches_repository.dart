@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'match_model.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../services/data/service_model.dart';
@@ -13,9 +12,7 @@ class MatchesRepository {
 
   // Actualiza el estado del match en Firebase
   Future<void> updateMatchStatus(String matchId, String newStatus) async {
-    await _firestore.collection('matches').doc(matchId).update({
-      'status': newStatus,
-    });
+    await _firestore.collection('matches').doc(matchId).update({'status': newStatus});
   }
 
   // Elimina un match de la base de datos (para limpiar el historial)
@@ -23,13 +20,9 @@ class MatchesRepository {
     await _firestore.collection('matches').doc(matchId).delete();
   }
 
-  // Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
-  // Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
-  Future<void> completeMatchAndRate(
-    String matchId,
-    String providerId,
-    double rating,
-  ) async {
+// Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
+ // Finaliza el servicio y calcula el nuevo promedio de estrellas del proveedor
+  Future<void> completeMatchAndRate(String matchId, String providerId, double rating) async {
     // 1. Cambiamos el estado del match a 'completed'
     await _firestore.collection('matches').doc(matchId).update({
       'status': 'completed',
@@ -39,7 +32,7 @@ class MatchesRepository {
 
     // 2. Usamos una "Transacción" para leer y actualizar el perfil del proveedor de forma segura
     final providerRef = _firestore.collection('users').doc(providerId);
-
+    
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(providerRef);
       if (!snapshot.exists) return;
@@ -63,18 +56,11 @@ class MatchesRepository {
 
   // Validaciones compartidas antes de crear una solicitud: sesión iniciada,
   // no ser el propio proveedor, no tener un match activo y obtener el clientName
-  Future<String> _validateRequestAndGetClientName(
-    String serviceId,
-    String providerId,
-  ) async {
+  Future<String> _validateRequestAndGetClientName(String serviceId, String providerId) async {
     final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('Debes iniciar sesión para solicitar un servicio');
-    }
+    if (user == null) throw Exception('Debes iniciar sesión para solicitar un servicio');
 
-    if (user.uid == providerId) {
-      throw Exception('No puedes solicitar tu propio servicio');
-    }
+    if (user.uid == providerId) throw Exception('No puedes solicitar tu propio servicio');
 
     // SOLUCIÓN #4: Validar en Firebase si ya existe un match de este usuario para este servicio
     final existingMatch = await _firestore
@@ -97,11 +83,8 @@ class MatchesRepository {
   }
 
   // Crea una nueva solicitud de servicio
-  Future<void> requestService(String serviceId, String providerId) async {
-    final clientName = await _validateRequestAndGetClientName(
-      serviceId,
-      providerId,
-    );
+Future<void> requestService(String serviceId, String providerId) async {
+    final clientName = await _validateRequestAndGetClientName(serviceId, providerId);
     final user = _auth.currentUser!;
 
     final docRef = _firestore.collection('matches').doc();
@@ -124,10 +107,7 @@ class MatchesRepository {
     required AddressModel address,
     required String paymentMethod,
   }) async {
-    final clientName = await _validateRequestAndGetClientName(
-      service.id,
-      service.providerId,
-    );
+    final clientName = await _validateRequestAndGetClientName(service.id, service.providerId);
     final user = _auth.currentUser!;
 
     final docRef = _firestore.collection('matches').doc();
@@ -178,9 +158,7 @@ class MatchesRepository {
 } // <--- Aquí cierra correctamente la clase MatchesRepository
 
 // Exponemos el repositorio para usarlo en la UI
-final matchesRepositoryProvider = Provider<MatchesRepository>(
-  (ref) => MatchesRepository(),
-);
+final matchesRepositoryProvider = Provider<MatchesRepository>((ref) => MatchesRepository());
 
 // Este proveedor escucha en tiempo real las solicitudes donde YO soy el proveedor
 Stream<List<MatchModel>> _matchesForUser(
@@ -193,11 +171,9 @@ Stream<List<MatchModel>> _matchesForUser(
       .where(field, isEqualTo: userId)
       .where('status', whereIn: statuses)
       .snapshots()
-      .map(
-        (snapshot) => snapshot.docs
-            .map((doc) => MatchModel.fromMap(doc.data(), doc.id))
-            .toList(),
-      );
+      .map((snapshot) => snapshot.docs
+          .map((doc) => MatchModel.fromMap(doc.data(), doc.id))
+          .toList());
 }
 
 final providerActiveMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
@@ -215,11 +191,11 @@ final providerHistoryMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
 
   if (user == null) return const Stream.empty();
 
-  return _matchesForUser('providerId', user.uid, [
-    'completed',
-    'rejected',
-    'cancelled',
-  ]);
+  return _matchesForUser(
+    'providerId',
+    user.uid,
+    ['completed', 'rejected', 'cancelled'],
+  );
 });
 
 final clientActiveMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
@@ -237,22 +213,17 @@ final clientHistoryMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
 
   if (user == null) return const Stream.empty();
 
-  return _matchesForUser('clientId', user.uid, [
-    'completed',
-    'rejected',
-    'cancelled',
-  ]);
+  return _matchesForUser(
+    'clientId',
+    user.uid,
+    ['completed', 'rejected', 'cancelled'],
+  );
 });
 // Proveedor para obtener los detalles de un match específico
-final matchDetailsProvider = StreamProvider.family<MatchModel?, String>((
-  ref,
-  matchId,
-) {
+final matchDetailsProvider = StreamProvider.family<MatchModel?, String>((ref, matchId) {
   return FirebaseFirestore.instance
       .collection('matches')
       .doc(matchId)
       .snapshots()
-      .map(
-        (doc) => doc.exists ? MatchModel.fromMap(doc.data()!, doc.id) : null,
-      );
+      .map((doc) => doc.exists ? MatchModel.fromMap(doc.data()!, doc.id) : null);
 });

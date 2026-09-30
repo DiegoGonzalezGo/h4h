@@ -26,13 +26,13 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _isProcessing = false;
 
-  Future<void> _simulatePayment() async {
+  Future<void> _simulatePayment(BuildContext themedContext) async {
     setState(() => _isProcessing = true);
 
     // Diálogo de progreso: no se puede cerrar manualmente
-    final dialogNavigator = Navigator.of(context);
+    final dialogNavigator = Navigator.of(themedContext);
     showDialog(
-      context: context,
+      context: themedContext,
       barrierDismissible: false,
       builder: (dialogContext) => const PopScope(
         canPop: false,
@@ -60,8 +60,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           );
     } catch (e) {
       dialogNavigator.pop();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!themedContext.mounted) return;
+      ScaffoldMessenger.of(themedContext).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: Colors.red,
@@ -72,11 +72,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     dialogNavigator.pop();
-    if (!mounted) return;
+    if (!themedContext.mounted) return;
 
     // Hoja de éxito: no se puede cerrar sin tocar el botón
     await showModalBottomSheet(
-      context: context,
+      context: themedContext,
       isDismissible: false,
       enableDrag: false,
       builder: (sheetContext) => Padding(
@@ -109,10 +109,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ),
     );
 
-    if (!mounted) return;
+    if (!themedContext.mounted) return;
 
-    final router = GoRouter.of(context);
-    Navigator.of(context).pop();
+    final router = GoRouter.of(themedContext);
+    Navigator.of(themedContext).pop();
     router.push('/client-matches');
   }
 
@@ -312,7 +312,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: _isProcessing ? null : _simulatePayment,
+                      onTap: _isProcessing
+                          ? null
+                          : () => _simulatePayment(context),
                       borderRadius: BorderRadius.circular(16),
                       child: Ink(
                         height: 56,
