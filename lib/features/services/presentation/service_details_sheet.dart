@@ -99,15 +99,6 @@ class _ServiceDetailsSheetState extends ConsumerState<ServiceDetailsSheet> {
       ),
     );
 
-    for (final controller in [
-      labelController,
-      streetController,
-      cityController,
-      referenceController,
-    ]) {
-      controller.dispose();
-    }
-
     if (newAddress == null) return;
 
     final user = FirebaseAuth.instance.currentUser;
