@@ -33,7 +33,7 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _isSubmitting = false;
 
-  Future<void> _simulatePayment(BuildContext context) async {
+  Future<void> _processPayment(BuildContext context) async {
     setState(() => _isSubmitting = true);
     final loadingDialog = showDialog<void>(
       context: context,
@@ -74,6 +74,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             widget.service.id,
             widget.service.providerId,
             serviceAddress: widget.selectedAddress,
+            service: widget.service,
+            paymentMethod: 'Tarjeta Simulada',
           );
       ref.invalidate(clientActiveMatchesProvider);
       if (!context.mounted) return;
@@ -123,7 +125,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                   const SizedBox(height: 18),
                   const Text(
-                    '¡Solicitud Enviada y Pagada!',
+                    '¡Pago procesado con éxito!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -155,7 +157,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Ir a Mis Solicitudes'),
+                      child: const Text('Ver Mis Solicitudes'),
                     ),
                   ),
                 ],
@@ -176,10 +178,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
         title: const Text('Confirmar Solicitud'),
-        backgroundColor: const Color(0xFF121212),
+        backgroundColor: const Color(0xFF000000),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -243,7 +245,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(
-                  Icons.location_on_outlined,
+                  Icons.location_on,
                   color: Colors.cyanAccent,
                 ),
                 title: Text(
@@ -267,45 +269,80 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _CheckoutSection(
-              title: 'Método de pago',
-              child: Row(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF151515),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(
-                    width: 44,
-                    height: 32,
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          left: 0,
-                          top: 4,
-                          child: CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Color(0xFFEB001B),
-                          ),
-                        ),
-                        Positioned(
-                          left: 15,
-                          top: 4,
-                          child: CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Color(0xFFF79E1B),
-                          ),
-                        ),
-                      ],
+                  const Text(
+                    'Método de pago',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      '**** 1234',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 44,
+                        height: 32,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: 0,
+                              top: 4,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Color(0xFFEB001B),
+                              ),
+                            ),
+                            Positioned(
+                              left: 15,
+                              top: 4,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Color(0xFFF79E1B),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          '**** **** **** 4242',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Método Simulado',
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  TextButton(onPressed: () {}, child: const Text('Cambiar')),
                 ],
               ),
             ),
@@ -325,7 +362,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               borderRadius: BorderRadius.circular(24),
             ),
             child: FilledButton(
-              onPressed: _isSubmitting ? null : () => _simulatePayment(context),
+              onPressed: _isSubmitting ? null : () => _processPayment(context),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,

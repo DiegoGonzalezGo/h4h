@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'match_model.dart';
 import '../../users/data/address_model.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../services/data/service_model.dart';
 
 class MatchesRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -65,6 +66,8 @@ class MatchesRepository {
     String serviceId,
     String providerId, {
     AddressModel? serviceAddress,
+    ServiceModel? service,
+    String? paymentMethod,
   }) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -103,6 +106,11 @@ class MatchesRepository {
       clientName: clientName, // Guardamos el nombre en el Match
       providerId: providerId,
       serviceAddress: serviceAddress,
+      serviceTitle: service?.title,
+      serviceDescription: service?.description,
+      servicePrice: service?.price,
+      serviceCategory: service?.category,
+      paymentMethod: paymentMethod,
     );
 
     await docRef.set(newMatch.toMap());

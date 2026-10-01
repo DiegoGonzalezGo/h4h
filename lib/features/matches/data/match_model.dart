@@ -13,6 +13,11 @@ class MatchModel {
   final DateTime? completedAt;
   final double? rating;
   final AddressModel? serviceAddress;
+  final String? serviceTitle;
+  final String? serviceDescription;
+  final double? servicePrice;
+  final String? serviceCategory;
+  final String? paymentMethod;
 
   // Constructor
   MatchModel({
@@ -25,6 +30,11 @@ class MatchModel {
     this.completedAt,
     this.rating,
     this.serviceAddress,
+    this.serviceTitle,
+    this.serviceDescription,
+    this.servicePrice,
+    this.serviceCategory,
+    this.paymentMethod,
   });
 
   factory MatchModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -45,6 +55,11 @@ class MatchModel {
               Map<String, dynamic>.from(map['serviceAddress'] as Map),
             )
           : null,
+      serviceTitle: map['serviceTitle'] as String?,
+      serviceDescription: map['serviceDescription'] as String?,
+      servicePrice: (map['servicePrice'] as num?)?.toDouble(),
+      serviceCategory: map['serviceCategory'] as String?,
+      paymentMethod: map['paymentMethod'] as String?,
     );
   }
 
@@ -57,6 +72,11 @@ class MatchModel {
       'status': status,
       if (rating != null) 'rating': rating,
       if (serviceAddress != null) 'serviceAddress': serviceAddress!.toMap(),
+      if (serviceTitle != null) 'serviceTitle': serviceTitle,
+      if (serviceDescription != null) 'serviceDescription': serviceDescription,
+      if (servicePrice != null) 'servicePrice': servicePrice,
+      if (serviceCategory != null) 'serviceCategory': serviceCategory,
+      if (paymentMethod != null) 'paymentMethod': paymentMethod,
     };
   }
 }

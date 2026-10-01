@@ -255,12 +255,12 @@ Future<void> showServiceDetailsDialog({
                                 ? null
                                 : () {
                                     if (selectedAddress == null) {
-                                      ScaffoldMessenger.of(context)
+                                      ScaffoldMessenger.of(navigationContext)
                                         ..hideCurrentSnackBar()
                                         ..showSnackBar(
                                           const SnackBar(
                                             content: Text(
-                                              'Por favor, selecciona una dirección',
+                                              'Selecciona una dirección',
                                             ),
                                             backgroundColor: Colors.red,
                                           ),
@@ -268,23 +268,17 @@ Future<void> showServiceDetailsDialog({
                                       return;
                                     }
 
+                                    final address = selectedAddress!;
                                     Navigator.pop(dialogContext);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          if (navigationContext.mounted) {
-                                            Navigator.push(
-                                              navigationContext,
-                                              MaterialPageRoute<void>(
-                                                builder: (context) =>
-                                                    CheckoutScreen(
-                                                      service: service,
-                                                      selectedAddress:
-                                                          selectedAddress!,
-                                                    ),
-                                              ),
-                                            );
-                                          }
-                                        });
+                                    Navigator.push(
+                                      navigationContext,
+                                      MaterialPageRoute<void>(
+                                        builder: (context) => CheckoutScreen(
+                                          service: service,
+                                          selectedAddress: address,
+                                        ),
+                                      ),
+                                    );
                                   },
                           ),
                       ],
