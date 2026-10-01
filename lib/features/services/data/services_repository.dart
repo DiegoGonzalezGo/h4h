@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'service_model.dart'; 
+
+import 'service_model.dart';
 import '../../auth/data/auth_repository.dart';
 
 class ServicesRepository {
@@ -9,7 +12,12 @@ class ServicesRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Recibe la categoría como nuevo parámetro
-  Future<void> createService(String title, String description, double price, String category) async {
+  Future<void> createService(
+    String title,
+    String description,
+    double price,
+    String category,
+  ) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Usuario no autenticado');
 
@@ -24,6 +32,22 @@ class ServicesRepository {
 
     await _firestore.collection('services').add(newService.toMap());
   }
+
+  Future<void> updateService({
+    required String serviceId,
+    required String title,
+    required String description,
+    required double price,
+    required String category,
+  }) async {
+    await _firestore.collection('services').doc(serviceId).update({
+      'title': title.trim(),
+      'description': description.trim(),
+      'price': price,
+      'category': category,
+    });
+  }
+
   // Cambia el estado de activo/inactivo
   Future<void> toggleServiceStatus(String serviceId, bool currentStatus) async {
     await _firestore.collection('services').doc(serviceId).update({
@@ -38,7 +62,9 @@ class ServicesRepository {
 } // <-- Fin de la clase
 
 // ¡ESTA ES LA LÍNEA QUE FALTABA! Exponemos el repositorio para que la interfaz lo pueda usar
-final servicesRepositoryProvider = Provider<ServicesRepository>((ref) => ServicesRepository());
+final servicesRepositoryProvider = Provider<ServicesRepository>(
+  (ref) => ServicesRepository(),
+);
 
 final servicesFeedProvider = StreamProvider<List<ServiceModel>>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -76,11 +102,50 @@ final myServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
       });
 });
 
+final savedServicesByIdsProvider =
+    FutureProvider.family<List<ServiceModel>, String>((ref, idsKey) async {
+      if (idsKey.isEmpty) return const <ServiceModel>[];
+
+      final savedIds = List<String>.from(jsonDecode(idsKey) as List);
+      if (savedIds.isEmpty) return const <ServiceModel>[];
+
+      final servicesById = <String, ServiceModel>{};
+      final firestore = FirebaseFirestore.instance;
+
+      for (var start = 0; start < savedIds.length; start += 10) {
+        final end = start + 10 < savedIds.length ? start + 10 : savedIds.length;
+        final idChunk = savedIds.sublist(start, end);
+        final snapshot = await firestore
+            .collection('services')
+            .where(FieldPath.documentId, whereIn: idChunk)
+            .get();
+
+        for (final document in snapshot.docs) {
+          servicesById[document.id] = ServiceModel.fromMap(
+            document.data(),
+            document.id,
+          );
+        }
+      }
+
+      return [
+        for (final id in savedIds)
+          if (servicesById[id] != null) servicesById[id]!,
+      ];
+    });
+
 // Proveedor para consultar los datos públicos del perfil de un proveedor (como sus estrellas)
-final providerProfileProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, providerId) async {
-  final doc = await FirebaseFirestore.instance.collection('users').doc(providerId).get();
-  return doc.data() ?? {};
-});
+final providerProfileProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((
+      ref,
+      providerId,
+    ) async {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(providerId)
+          .get();
+      return doc.data() ?? {};
+    });
 
 // Proveedor actualizado que descarga los servicios y oculta los del propio usuario
 final activeServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
@@ -96,7 +161,7 @@ final activeServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
         final services = snapshot.docs
             .map((doc) => ServiceModel.fromMap(doc.data(), doc.id))
             .toList();
-        
+
         // 3. Si no hay usuario logueado, regresamos todo.
         // Si sí lo hay, quitamos de la lista los servicios que le pertenecen.
         if (user == null) return services;
@@ -105,8 +170,14 @@ final activeServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
 });
 
 // Proveedor para consultar los datos de un solo servicio usando su ID
-final singleServiceProvider = FutureProvider.family<ServiceModel?, String>((ref, serviceId) async {
-  final doc = await FirebaseFirestore.instance.collection('services').doc(serviceId).get();
+final singleServiceProvider = FutureProvider.family<ServiceModel?, String>((
+  ref,
+  serviceId,
+) async {
+  final doc = await FirebaseFirestore.instance
+      .collection('services')
+      .doc(serviceId)
+      .get();
   if (doc.exists) {
     return ServiceModel.fromMap(doc.data()!, doc.id);
   }
@@ -114,10 +185,15 @@ final singleServiceProvider = FutureProvider.family<ServiceModel?, String>((ref,
 });
 
 // Proveedor que trae a los 10 mejores proveedores ordenados por calificación
-final topProvidersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final topProvidersProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final snapshot = await FirebaseFirestore.instance
       .collection('users')
-      .orderBy('averageRating', descending: true) // Los de mayor calificación primero
+      .orderBy(
+        'averageRating',
+        descending: true,
+      ) // Los de mayor calificación primero
       .limit(10) // Solo traemos el Top 10 para no saturar la base de datos
       .get();
 

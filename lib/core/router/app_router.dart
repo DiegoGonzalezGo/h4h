@@ -1,8 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/navigation/presentation/main_navigation_scaffold.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/services/presentation/services_feed_screen.dart';
+import '../../features/services/presentation/saved_services_screen.dart';
+import '../../features/services/presentation/confirm_service_request_screen.dart';
+import '../../features/users/presentation/my_addresses_screen.dart';
 import '../../features/auth/data/auth_repository.dart'; // Importamos el espía que acabamos de crear
 import '../../features/users/presentation/profile_screen.dart';
 import '../../features/services/presentation/create_service_screen.dart';
@@ -61,13 +65,39 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/banned',
         builder: (context, state) => const BannedScreen(),
       ),
-      GoRoute(
-        path: '/feed',
-        builder: (context, state) => const ServicesFeedScreen(),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainNavigationScaffold(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/feed',
+                builder: (context, state) => const ServicesFeedScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/history',
+                builder: (context, state) => const HistoryScreen(),
+              ),
+              GoRoute(
+                path: '/client-history',
+                builder: (context, state) => const HistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: '/create-service',
@@ -82,6 +112,24 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MyServicesScreen(),
       ),
       GoRoute(
+        path: '/saved-services',
+        builder: (context, state) => const SavedServicesScreen(),
+      ),
+      GoRoute(
+        path: '/confirm-request',
+        builder: (context, state) {
+          final checkout = state.extra! as ServiceCheckoutArgs;
+          return CheckoutScreen(
+            service: checkout.service,
+            selectedAddress: checkout.address,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/my-addresses',
+        builder: (context, state) => const MyAddressesScreen(),
+      ),
+      GoRoute(
         path: '/chat/:matchId', // Los dos puntos indican que es un parámetro dinámico
         builder: (context, state) {
           final matchId = state.pathParameters['matchId']!;
@@ -93,14 +141,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ClientMatchesScreen(),
       ),
       GoRoute(path: '/', redirect: (context, state) => '/feed'),
-      GoRoute(
-        path: '/client-history',
-        builder: (context, state) => const HistoryScreen(),
-      ),
-      GoRoute(
-        path: '/history',
-        builder: (context, state) => const HistoryScreen(),
-      ),
       GoRoute(
         path: '/ranking',
         builder: (context, state) => const TopProvidersScreen(),

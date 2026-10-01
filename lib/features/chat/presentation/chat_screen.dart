@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../data/chat_repository.dart';
 import '../../matches/data/matches_repository.dart';
+import '../../services/data/services_repository.dart';
 import '../../users/presentation/report_user_menu.dart';
 
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xFF121212),
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: matchAsync.when(
           data: (match) {
             if (match == null || currentUserId == null) {
@@ -98,6 +102,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
+          matchAsync.when(
+            data: (match) {
+              if (match == null) return const SizedBox.shrink();
+
+              return Consumer(
+                builder: (context, ref, child) {
+                  final serviceAsync = ref.watch(
+                    singleServiceProvider(match.serviceId),
+                  );
+
+                  return serviceAsync.when(
+                    data: (service) => _ServiceContextBanner(
+                      serviceName: service?.title ?? 'Servicio no disponible',
+                    ),
+                    loading: () => const _ServiceContextBanner(
+                      serviceName: 'Cargando servicio...',
+                    ),
+                    error: (error, stack) => const _ServiceContextBanner(
+                      serviceName: 'Servicio no disponible',
+                    ),
+                  );
+                },
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (error, stack) => const SizedBox.shrink(),
+          ),
           Expanded(
             child: messagesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -130,14 +161,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: isMe
-                              ? Colors.blue.shade100
-                              : Colors.grey.shade200,
+                              ? const Color(0xFF2575FC)
+                              : const Color(0xFF2C2C2E),
                           borderRadius: BorderRadius.circular(16).copyWith(
-                            bottomRight: isMe ? const Radius.circular(0) : null,
-                            bottomLeft: !isMe ? const Radius.circular(0) : null,
+                            bottomRight: isMe ? const Radius.circular(4) : null,
+                            bottomLeft: !isMe ? const Radius.circular(4) : null,
                           ),
                         ),
-                        child: Text(msg.text),
+                        child: Text(
+                          msg.text,
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       ),
                     );
                   },
@@ -147,17 +181,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           // Barra inferior para escribir
           Container(
-            padding: const EdgeInsets.all(8.0),
-            color: Colors.white,
+            padding: const EdgeInsets.all(8),
+            color: const Color(0xFF121212),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Escribe un mensaje...',
+                      hintStyle: const TextStyle(color: Colors.white54),
+                      filled: true,
+                      fillColor: const Color(0xFF1E1E1E),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -166,14 +213,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: Colors.blue,
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF00B4DB),
+                  ),
                   child: IconButton(
+                    tooltip: 'Enviar mensaje',
                     icon: const Icon(Icons.send, color: Colors.white),
                     onPressed: _sendMessage,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceContextBanner extends StatelessWidget {
+  const _ServiceContextBanner({required this.serviceName});
+
+  final String serviceName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: const Color(0xFF1E1E1E),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Color(0xFF00B4DB), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Acordando detalles para: $serviceName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
           ),
         ],

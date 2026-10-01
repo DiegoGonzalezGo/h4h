@@ -41,9 +41,18 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'Directorio de Servicios',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
+      theme: ThemeData.dark(useMaterial3: true).copyWith(
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        cardColor: const Color(0xFF1E1E1E),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: Colors.white,
+        ),
+        colorScheme: ThemeData.dark().colorScheme.copyWith(
+          primary: const Color(0xFF00B4DB),
+          secondary: const Color(0xFF6A11CB),
+        ),
       ),
       routerConfig: router, // Usamos la variable en lugar del import directo
       debugShowCheckedModeBanner: false,

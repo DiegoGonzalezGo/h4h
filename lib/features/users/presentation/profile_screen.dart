@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../auth/data/auth_repository.dart';
 import '../data/user_repository.dart';
 import '../data/provider_mode.dart';
+import 'payment_methods_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -13,10 +15,10 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Escuchamos el estado del proveedor (Modo Cliente o Modo Proveedor)
     final isProviderMode = ref.watch(providerModeProvider);
-    
+
     // Obtenemos el ID del usuario actual para consultar sus datos
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    
+
     if (userId == null) {
       return const Scaffold(body: Center(child: Text('Usuario no encontrado')));
     }
@@ -34,14 +36,14 @@ class ProfileScreen extends ConsumerWidget {
               ref.read(authRepositoryProvider).signOut();
               context.go('/login');
             },
-          )
+          ),
         ],
       ),
-      body: SingleChildScrollView( 
+      body: SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 24),
-            
+
             // --- SECCIÓN DE ENCABEZADO (FOTO, NOMBRE Y BOTÓN DE EDITAR) ---
             userProfileAsync.when(
               loading: () => const CircularProgressIndicator(),
@@ -52,34 +54,64 @@ class ProfileScreen extends ConsumerWidget {
 
                 return Column(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.blue.shade100,
-                      backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                      child: photoUrl == null 
-                          ? const Icon(Icons.person, size: 50, color: Colors.white)
-                          : null,
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.blue.shade100,
+                        backgroundImage: photoUrl != null
+                            ? NetworkImage(photoUrl)
+                            : null,
+                        child: photoUrl == null
+                            ? const Icon(
+                                Icons.person,
+                                size: 50,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       name,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    if (userData['bio'] != null && userData['bio'].toString().isNotEmpty)
+                    if (userData['bio'] != null &&
+                        userData['bio'].toString().isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 8.0, left: 24, right: 24),
+                        padding: const EdgeInsets.only(
+                          top: 8.0,
+                          left: 24,
+                          right: 24,
+                        ),
                         child: Text(
                           userData['bio'],
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade700, fontStyle: FontStyle.italic),
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     const SizedBox(height: 8),
-                    TextButton.icon(
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFF2575FC)),
+                      ),
                       icon: const Icon(Icons.edit, size: 18),
                       label: const Text('Editar perfil'),
                       onPressed: () {
-                        context.push('/edit-profile'); 
+                        context.push('/edit-profile');
                       },
                     ),
                   ],
@@ -89,15 +121,15 @@ class ProfileScreen extends ConsumerWidget {
             // --- FIN DEL ENCABEZADO ---
 
             const SizedBox(height: 24),
-            const Divider(),
-            
-            // --- SWITCH DE MODO ---
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: SwitchListTile(
-                title: Text(
-                  isProviderMode ? 'Modo Proveedor' : 'Modo Cliente',
-                ),
+                title: Text(isProviderMode ? 'Modo Proveedor' : 'Modo Cliente'),
                 subtitle: Text(
                   isProviderMode
                       ? 'Activa para ofrecer servicios'
@@ -110,13 +142,33 @@ class ProfileScreen extends ConsumerWidget {
                 },
               ),
             ),
-            const Divider(),
-            
+
+            const SizedBox(height: 20),
+
             // Renderizamos los menús dependiendo del modo
-            isProviderMode ? _buildProviderView(context) : _buildClientView(context),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: isProviderMode
+                  ? _buildProviderView(context)
+                  : _buildClientView(context),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _brandIcon(IconData icon) {
+    return ShaderMask(
+      shaderCallback: (bounds) =>
+          const LinearGradient(colors: [Color(0xFF6A11CB), Color(0xFF2575FC)])
+              .createShader(bounds),
+      blendMode: BlendMode.srcIn,
+      child: Icon(icon, color: Colors.white),
     );
   }
 
@@ -124,7 +176,7 @@ class ProfileScreen extends ConsumerWidget {
     return Column(
       children: [
         ListTile(
-          leading: const Icon(Icons.add_circle_outline),
+          leading: _brandIcon(Icons.add_circle_outline),
           title: const Text('Publicar nuevo servicio'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
@@ -132,7 +184,7 @@ class ProfileScreen extends ConsumerWidget {
           },
         ),
         ListTile(
-          leading: const Icon(Icons.list_alt),
+          leading: _brandIcon(Icons.list_alt),
           title: const Text('Mis servicios publicados'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
@@ -140,7 +192,7 @@ class ProfileScreen extends ConsumerWidget {
           },
         ),
         ListTile(
-          leading: const Icon(Icons.notifications_active),
+          leading: _brandIcon(Icons.notifications_active),
           title: const Text('Solicitudes entrantes'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
@@ -148,10 +200,20 @@ class ProfileScreen extends ConsumerWidget {
           },
         ),
         ListTile(
-          leading: const Icon(Icons.history),
-          title: const Text('Historial de servicios'),
+          leading: _brandIcon(Icons.bar_chart),
+          title: const Text('Mis Ganancias / Estadísticas'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/history'),
+          onTap: () {
+            // TODO: Ruta a Mis Ganancias / Estadísticas
+          },
+        ),
+        ListTile(
+          leading: _brandIcon(Icons.calendar_month),
+          title: const Text('Horarios y Disponibilidad'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            // TODO: Ruta a Horarios y Disponibilidad
+          },
         ),
       ],
     );
@@ -161,15 +223,7 @@ class ProfileScreen extends ConsumerWidget {
     return Column(
       children: [
         ListTile(
-          leading: const Icon(Icons.search),
-          title: const Text('Buscar servicios'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            context.go('/feed');
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.handshake),
+          leading: _brandIcon(Icons.handshake),
           title: const Text('Mis solicitudes enviadas'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
@@ -177,11 +231,32 @@ class ProfileScreen extends ConsumerWidget {
           },
         ),
         ListTile(
-          leading: const Icon(Icons.check_circle_outline),
-          title: const Text('Historial de servicios'),
+          leading: _brandIcon(Icons.bookmark_border),
+          title: const Text('Servicios Guardados'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            context.push('/client-history'); 
+            context.push('/saved-services');
+          },
+        ),
+        ListTile(
+          leading: _brandIcon(Icons.location_on_outlined),
+          title: const Text('Mis Direcciones'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.push('/my-addresses');
+          },
+        ),
+        ListTile(
+          leading: _brandIcon(Icons.credit_card),
+          title: const Text('Métodos de Pago'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => const PaymentMethodsScreen(),
+              ),
+            );
           },
         ),
       ],

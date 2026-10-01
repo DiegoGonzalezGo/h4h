@@ -1,25 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../data/services_repository.dart';
 
 class CreateServiceScreen extends ConsumerStatefulWidget {
   const CreateServiceScreen({super.key});
 
   @override
-  ConsumerState<CreateServiceScreen> createState() => _CreateServiceScreenState();
+  ConsumerState<CreateServiceScreen> createState() =>
+      _CreateServiceScreenState();
 }
 
 class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
-  
+
   String _selectedCategory = 'Tecnología';
   bool _isLoading = false;
 
   // 1. FALTABA: La lista de categorías disponibles
-  final List<String> _categories = ['Tecnología', 'Educación', 'Hogar', 'Salud', 'General'];
+  final List<String> _categories = [
+    'Tecnología',
+    'Educación',
+    'Hogar',
+    'Salud',
+    'General',
+  ];
 
   @override
   void dispose() {
@@ -36,21 +44,26 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
 
     try {
       final price = double.tryParse(_priceController.text) ?? 0.0;
-      
+
       // 2. FALTABA: Enviar la categoría seleccionada al repositorio
       // Nota: Si tu repositorio usa parámetros posicionales, quita los nombres (title:, description:, etc.)
-      await ref.read(servicesRepositoryProvider).createService(
-        _titleController.text.trim(),
-        _descController.text.trim(),
-        price,
-        _selectedCategory, // <-- Pasamos la categoría
-      );
+      await ref
+          .read(servicesRepositoryProvider)
+          .createService(
+            _titleController.text.trim(),
+            _descController.text.trim(),
+            price,
+            _selectedCategory, // <-- Pasamos la categoría
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Servicio publicado con éxito ✅'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Servicio publicado con éxito ✅'),
+            backgroundColor: Colors.green,
+          ),
         );
-        context.pop(); 
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -63,40 +76,72 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
     }
   }
 
+  InputDecoration _fieldDecoration(
+    String label,
+    IconData icon, {
+    String? prefixText,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: Colors.grey[400]),
+      prefixText: prefixText,
+      filled: true,
+      fillColor: const Color(0xFF1E1E1E),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF6A11CB), width: 1.5),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Publicar Servicio')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
+            TextFormField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Título del servicio (ej. Clases de Guitarra)'),
+              decoration: _fieldDecoration(
+                'Título del servicio (ej. Clases de Guitarra)',
+                Icons.title,
+              ),
             ),
             const SizedBox(height: 16),
-            TextField(
+            TextFormField(
               controller: _descController,
-              decoration: const InputDecoration(labelText: 'Descripción detallada'),
+              decoration: _fieldDecoration(
+                'Descripción detallada',
+                Icons.description,
+              ),
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            TextField(
+            TextFormField(
               controller: _priceController,
-              decoration: const InputDecoration(labelText: 'Precio (ej. 150.00)', prefixText: '\$'),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: _fieldDecoration(
+                'Precio (ej. 150.00)',
+                Icons.attach_money,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
             ),
             const SizedBox(height: 16),
-            
-            // 3. FALTABA: El menú desplegable en la interfaz
             DropdownButtonFormField<String>(
               initialValue: _selectedCategory,
-              decoration: const InputDecoration(
-                labelText: 'Categoría',
-                border: OutlineInputBorder(),
-              ),
+              decoration: _fieldDecoration('Categoría', Icons.category),
               items: _categories.map((String category) {
                 return DropdownMenuItem<String>(
                   value: category,
@@ -109,13 +154,37 @@ class _CreateServiceScreenState extends ConsumerState<CreateServiceScreen> {
                 });
               },
             ),
-            
             const SizedBox(height: 32),
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : FilledButton(
-                    onPressed: _submit,
-                    child: const Text('Publicar Oferta'),
+                : SizedBox(
+                    width: double.infinity,
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                      child: InkWell(
+                        onTap: _submit,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Publicar Oferta',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
           ],
         ),

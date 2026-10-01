@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../users/data/address_model.dart';
+
 // variables de Modelo de datos para un match entre cliente y proveedor
 class MatchModel {
   final String id;
@@ -10,8 +12,9 @@ class MatchModel {
   final String status;
   final DateTime? completedAt;
   final double? rating;
+  final AddressModel? serviceAddress;
 
-// Constructor
+  // Constructor
   MatchModel({
     required this.id,
     required this.serviceId,
@@ -21,6 +24,7 @@ class MatchModel {
     this.status = 'pending',
     this.completedAt,
     this.rating,
+    this.serviceAddress,
   });
 
   factory MatchModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -28,13 +32,19 @@ class MatchModel {
       id: documentId,
       serviceId: map['serviceId'] ?? '',
       clientId: map['clientId'] ?? '',
-      clientName: map['clientName'] ?? 'Cliente', // <-- NUEVO (con valor por defecto)
+      clientName:
+          map['clientName'] ?? 'Cliente', // <-- NUEVO (con valor por defecto)
       providerId: map['providerId'] ?? '',
       status: map['status'] ?? 'pending',
-      completedAt: map['completedAt'] != null 
-          ? (map['completedAt'] as Timestamp).toDate() 
+      completedAt: map['completedAt'] != null
+          ? (map['completedAt'] as Timestamp).toDate()
           : null,
-        rating: (map['rating'] as num?)?.toDouble(),
+      rating: (map['rating'] as num?)?.toDouble(),
+      serviceAddress: map['serviceAddress'] is Map
+          ? AddressModel.fromMap(
+              Map<String, dynamic>.from(map['serviceAddress'] as Map),
+            )
+          : null,
     );
   }
 
@@ -46,6 +56,7 @@ class MatchModel {
       'providerId': providerId,
       'status': status,
       if (rating != null) 'rating': rating,
+      if (serviceAddress != null) 'serviceAddress': serviceAddress!.toMap(),
     };
   }
 }
