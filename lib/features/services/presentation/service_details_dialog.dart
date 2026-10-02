@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../matches/data/matches_repository.dart';
 import '../../users/data/address_model.dart';
 import '../../users/data/user_repository.dart';
-import 'confirm_service_request_screen.dart';
+import 'checkout_screen.dart';
 import '../data/service_model.dart';
 import '../data/services_repository.dart';
 
@@ -16,7 +16,6 @@ Future<void> showServiceDetailsDialog({
   required WidgetRef ref,
   required ServiceModel service,
 }) async {
-  final navigationContext = context;
   AddressModel? selectedAddress;
 
   await showDialog<void>(
@@ -255,27 +254,24 @@ Future<void> showServiceDetailsDialog({
                                 ? null
                                 : () {
                                     if (selectedAddress == null) {
-                                      ScaffoldMessenger.of(navigationContext)
+                                      ScaffoldMessenger.of(context)
                                         ..hideCurrentSnackBar()
                                         ..showSnackBar(
                                           const SnackBar(
-                                            content: Text(
-                                              'Selecciona una dirección',
-                                            ),
+                                            content: Text('Selecciona una dirección'),
                                             backgroundColor: Colors.red,
                                           ),
                                         );
                                       return;
                                     }
 
-                                    final address = selectedAddress!;
-                                    Navigator.pop(dialogContext);
+                                    Navigator.pop(context);
                                     Navigator.push(
-                                      navigationContext,
-                                      MaterialPageRoute<void>(
+                                      context,
+                                      MaterialPageRoute(
                                         builder: (context) => CheckoutScreen(
-                                          service: service,
-                                          selectedAddress: address,
+                                          servicio: service,
+                                          selectedAddress: selectedAddress!,
                                         ),
                                       ),
                                     );
