@@ -41,7 +41,25 @@ final currentUserControllerProvider =
       CurrentUserController.new,
     );
 
+final walletTransactionsProvider = StreamProvider<List<Map<String, dynamic>>>((
+  ref,
+) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const Stream.empty();
+
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('walletTransactions')
+      .orderBy('createdAt', descending: true)
+      .limit(20)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+});
+
 class CurrentUserController extends StreamNotifier<UserModel?> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   @override
   Stream<UserModel?> build() {
     final user = ref.watch(authStateProvider).value;
@@ -55,6 +73,106 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
           final data = snapshot.data();
           return data == null ? null : UserModel.fromMap(data, snapshot.id);
         });
+  }
+
+  Future<void> deductBalance(
+    double amount, {
+    required String description,
+  }) async {
+    if (amount <= 0) {
+      throw ArgumentError.value(amount, 'amount', 'Debe ser mayor que cero.');
+    }
+
+    final currentUser = state.value;
+    if (currentUser == null) {
+      throw StateError('No hay un usuario cargado para descontar saldo.');
+    }
+
+    final userRef = _firestore.collection('users').doc(currentUser.uid);
+    final updatedUser = currentUser.copyWith(
+      balance: currentUser.balance - amount,
+    );
+    state = AsyncData(updatedUser);
+
+    try {
+      final updatedBalance = await _firestore.runTransaction<double>((
+        transaction,
+      ) async {
+        final snapshot = await transaction.get(userRef);
+        if (!snapshot.exists) {
+          throw StateError('No se encontró el perfil del usuario.');
+        }
+
+        final data = snapshot.data()!;
+        final storedBalance = data['balance'];
+        final balance = storedBalance is num
+            ? storedBalance.toDouble()
+            : UserModel.defaultBalance;
+        if (balance < amount) {
+          throw StateError('Saldo insuficiente en tu billetera.');
+        }
+
+        final nextBalance = balance - amount;
+        if (storedBalance is num) {
+          transaction.update(userRef, {
+            'balance': FieldValue.increment(-amount),
+          });
+        } else {
+          transaction.set(userRef, {
+            'balance': nextBalance,
+          }, SetOptions(merge: true));
+        }
+        final transactionRef = userRef.collection('walletTransactions').doc();
+        transaction.set(transactionRef, {
+          'amount': -amount,
+          'description': description,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        return nextBalance;
+      });
+
+      state = AsyncData(currentUser.copyWith(balance: updatedBalance));
+    } catch (error, stackTrace) {
+      state = AsyncData(currentUser);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> refundBalanceAfterFailedRequest(double amount) async {
+    if (amount <= 0) {
+      throw ArgumentError.value(amount, 'amount', 'Debe ser mayor que cero.');
+    }
+
+    final currentUser = state.value;
+    if (currentUser == null) {
+      throw StateError('No hay un usuario cargado para reembolsar el saldo.');
+    }
+
+    final userRef = _firestore.collection('users').doc(currentUser.uid);
+    final updatedUser = currentUser.copyWith(
+      balance: currentUser.balance + amount,
+    );
+    state = AsyncData(updatedUser);
+
+    try {
+      await _firestore.runTransaction<void>((transaction) async {
+        final userSnapshot = await transaction.get(userRef);
+        if (!userSnapshot.exists) {
+          throw StateError('No se encontró el perfil del usuario.');
+        }
+
+        transaction.update(userRef, {'balance': FieldValue.increment(amount)});
+        final transactionRef = userRef.collection('walletTransactions').doc();
+        transaction.set(transactionRef, {
+          'amount': amount,
+          'description': 'Reembolso por solicitud no completada',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (error, stackTrace) {
+      state = AsyncData(currentUser);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<void> toggleSavedService(String serviceId) async {

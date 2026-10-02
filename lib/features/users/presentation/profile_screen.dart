@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/user_repository.dart';
 import '../data/provider_mode.dart';
-import 'payment_methods_screen.dart';
+import 'wallet_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -248,13 +248,13 @@ class ProfileScreen extends ConsumerWidget {
         ),
         ListTile(
           leading: _brandIcon(Icons.credit_card),
-          title: const Text('Métodos de Pago'),
+          title: const Text('Billetera y Pagos'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute<void>(
-                builder: (context) => const PaymentMethodsScreen(),
+                builder: (context) => const WalletScreen(),
               ),
             );
           },

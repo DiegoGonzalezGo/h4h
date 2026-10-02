@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../matches/data/matches_repository.dart';
 import '../../users/data/address_model.dart';
+import '../../users/data/user_repository.dart';
 import '../data/service_model.dart';
 
 class ServiceCheckoutArgs {
@@ -31,6 +32,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
+    var balanceDeducted = false;
 
     final loadingDialog = showDialog<void>(
       context: context,
@@ -65,6 +67,32 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       await Future<void>.delayed(const Duration(seconds: 3));
 
+      final user = ref.read(currentUserControllerProvider).value;
+      if (user == null) {
+        throw StateError('No se pudo cargar tu perfil para procesar el pago.');
+      }
+      if (user.balance < widget.servicio.price) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true).pop();
+        await loadingDialog;
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saldo insuficiente en tu billetera'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      await ref
+          .read(currentUserControllerProvider.notifier)
+          .deductBalance(
+            widget.servicio.price,
+            description: 'Pago retenido - ${widget.servicio.title}',
+          );
+      balanceDeducted = true;
+
       await ref
           .read(matchesRepositoryProvider)
           .requestService(
@@ -72,6 +100,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             serviceAddress: widget.selectedAddress,
             paymentMethod: 'Tarjeta Simulada',
           );
+      balanceDeducted = false;
       ref.invalidate(clientActiveMatchesProvider);
 
       if (!mounted) return;
@@ -148,12 +177,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       );
     } catch (error) {
       if (!mounted) return;
+      Object failure = error;
+      if (balanceDeducted) {
+        try {
+          await ref
+              .read(currentUserControllerProvider.notifier)
+              .refundBalanceAfterFailedRequest(widget.servicio.price);
+        } catch (refundError) {
+          failure = StateError(
+            '$error. Además, no se pudo reembolsar el saldo: $refundError',
+          );
+        }
+      }
+      if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
       await loadingDialog;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo procesar el pago: $error'),
+          content: Text('No se pudo procesar el pago: $failure'),
           backgroundColor: Colors.red,
         ),
       );

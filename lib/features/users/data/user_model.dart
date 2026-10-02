@@ -1,6 +1,8 @@
 import 'address_model.dart';
 
 class UserModel {
+  static const double defaultBalance = 10000.0;
+
   final String uid;
   final String name;
   final String email;
@@ -9,6 +11,7 @@ class UserModel {
   final List<String> savedServices;
   final List<AddressModel> addresses;
   final double rating;
+  final double balance;
 
   UserModel({
     required this.uid,
@@ -19,6 +22,7 @@ class UserModel {
     this.savedServices = const [],
     this.addresses = const [],
     this.rating = 0.0,
+    this.balance = defaultBalance,
   });
 
   // Convierte el mapa de Firebase a un objeto Dart
@@ -44,6 +48,7 @@ class UserModel {
                 .toList()
           : const [],
       rating: (map['rating'] ?? 0.0).toDouble(),
+      balance: (map['balance'] as num?)?.toDouble() ?? defaultBalance,
     );
   }
 
@@ -57,12 +62,14 @@ class UserModel {
       'savedServices': savedServices,
       'addresses': addresses.map((address) => address.toMap()).toList(),
       'rating': rating,
+      'balance': balance,
     };
   }
 
   UserModel copyWith({
     List<String>? savedServices,
     List<AddressModel>? addresses,
+    double? balance,
   }) {
     return UserModel(
       uid: uid,
@@ -73,6 +80,7 @@ class UserModel {
       savedServices: savedServices ?? this.savedServices,
       addresses: addresses ?? this.addresses,
       rating: rating,
+      balance: balance ?? this.balance,
     );
   }
 }
