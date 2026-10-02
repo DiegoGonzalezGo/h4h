@@ -54,7 +54,10 @@ class _ClientMatchesScreenState extends ConsumerState<ClientMatchesScreen> {
     final matchesAsync = ref.watch(clientActiveMatchesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mis Solicitudes Enviadas')),
+      appBar: AppBar(
+        leading: const BackButton(color: Colors.white),
+        title: const Text('Mis Solicitudes Enviadas'),
+      ),
       body: Column(
         children: [
           Container(

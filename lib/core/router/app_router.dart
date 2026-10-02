@@ -5,7 +5,7 @@ import '../../features/navigation/presentation/main_navigation_scaffold.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/services/presentation/services_feed_screen.dart';
 import '../../features/services/presentation/saved_services_screen.dart';
-import '../../features/services/presentation/confirm_service_request_screen.dart';
+import '../../features/services/presentation/checkout_screen.dart';
 import '../../features/users/presentation/my_addresses_screen.dart';
 import '../../features/auth/data/auth_repository.dart'; // Importamos el espía que acabamos de crear
 import '../../features/users/presentation/profile_screen.dart';
@@ -120,7 +120,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final checkout = state.extra! as ServiceCheckoutArgs;
           return CheckoutScreen(
-            service: checkout.service,
+            servicio: checkout.service,
             selectedAddress: checkout.address,
           );
         },

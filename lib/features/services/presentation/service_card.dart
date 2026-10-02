@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../chat/presentation/chat_screen.dart';
 import '../../matches/data/matches_repository.dart';
 import '../../users/data/user_repository.dart';
 import '../data/service_model.dart';
@@ -195,7 +196,17 @@ class ServiceCard extends ConsumerWidget {
                         if (requestStatusAsync.isLoading && request == null)
                           const _RequestStatusBadge(label: 'Comprobando...')
                         else if (request?.status == 'pending')
-                          const _RequestStatusBadge(label: 'Pendiente')
+                          _PendingRequestButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (context) => ChatScreen(
+                                    matchId: request!.id,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
                         else if (request?.status == 'accepted')
                           _GradientRequestButton(
                             label: 'Abrir Chat',
@@ -278,6 +289,31 @@ class _RequestStatusBadge extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+}
+
+class _PendingRequestButton extends StatelessWidget {
+  const _PendingRequestButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF4A3B2A),
+        foregroundColor: const Color(0xFFFFD180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      child: const Text(
+        'Chat (Pendiente)',
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
     );
   }

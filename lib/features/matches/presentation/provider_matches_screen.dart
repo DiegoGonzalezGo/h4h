@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Importante para la navegación al chat
 
+import '../../chat/presentation/chat_screen.dart';
 import '../data/matches_repository.dart';
 import '../data/match_model.dart';
 import '../../services/data/services_repository.dart';
@@ -297,6 +298,29 @@ class _ProviderRequestCard extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => ChatScreen(matchId: match.id),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Abrir Chat'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.cyanAccent,
+                side: const BorderSide(color: Colors.cyanAccent),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
           ),
         ],
       ),

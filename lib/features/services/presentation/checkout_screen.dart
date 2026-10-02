@@ -1,12 +1,18 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../matches/data/matches_repository.dart';
 import '../../users/data/address_model.dart';
 import '../data/service_model.dart';
 
-class CheckoutScreen extends StatefulWidget {
+class ServiceCheckoutArgs {
+  const ServiceCheckoutArgs({required this.service, required this.address});
+
+  final ServiceModel service;
+  final AddressModel address;
+}
+
+class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({
     required this.servicio,
     required this.selectedAddress,
@@ -17,10 +23,10 @@ class CheckoutScreen extends StatefulWidget {
   final AddressModel selectedAddress;
 
   @override
-  State<CheckoutScreen> createState() => _CheckoutScreenState();
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
-class _CheckoutScreenState extends State<CheckoutScreen> {
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _isProcessing = false;
 
   Future<void> _processPayment() async {
@@ -59,27 +65,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       await Future<void>.delayed(const Duration(seconds: 3));
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('Debes iniciar sesión para continuar.');
-      }
-
-      await FirebaseFirestore.instance.collection('Solicitudes').add({
-        'servicioId': widget.servicio.id,
-        'servicioTitulo': widget.servicio.title,
-        'servicioDescripcion': widget.servicio.description,
-        'servicioPrecio': widget.servicio.price,
-        'categoria': widget.servicio.category,
-        'clienteId': user.uid,
-        'clienteEmail': user.email ?? '',
-        'proveedorId': widget.servicio.providerId,
-        'estado': 'Pendiente',
-        'direccionAlias': widget.selectedAddress.alias,
-        'direccionCalle': widget.selectedAddress.street,
-        'direccionReferencia': widget.selectedAddress.reference,
-        'metodoPago': 'Tarjeta Simulada',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await ref
+          .read(matchesRepositoryProvider)
+          .requestService(
+            service: widget.servicio,
+            serviceAddress: widget.selectedAddress,
+            paymentMethod: 'Tarjeta Simulada',
+          );
+      ref.invalidate(clientActiveMatchesProvider);
 
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
@@ -130,7 +123,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     onPressed: () {
                       Navigator.pop(sheetContext);
                       if (context.mounted) {
-                        context.go('/client-matches');
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
                       }
                     },
                     style: FilledButton.styleFrom(
@@ -142,7 +136,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Ver Mis Solicitudes',
+                      'Volver al Inicio',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),

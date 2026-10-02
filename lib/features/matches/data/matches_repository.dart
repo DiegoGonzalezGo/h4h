@@ -3,13 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'match_model.dart';
-import '../../users/data/address_model.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../services/data/service_model.dart';
+import '../../users/data/address_model.dart';
 
 class MatchesRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Actualiza el estado del match en Firebase
   Future<void> updateMatchStatus(String matchId, String newStatus) async {
@@ -61,59 +60,47 @@ class MatchesRepository {
     });
   }
 
-  // Crea una nueva solicitud de servicio
-  Future<void> requestService(
-    String serviceId,
-    String providerId, {
-    AddressModel? serviceAddress,
-    ServiceModel? service,
-    String? paymentMethod,
+  Future<void> requestService({
+    required ServiceModel service,
+    required AddressModel serviceAddress,
+    required String paymentMethod,
   }) async {
-    final user = _auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('Debes iniciar sesión para solicitar un servicio');
     }
-
-    if (user.uid == providerId) {
+    if (user.uid == service.providerId) {
       throw Exception('No puedes solicitar tu propio servicio');
     }
 
-    // SOLUCIÓN #4: Validar en Firebase si ya existe un match de este usuario para este servicio
-    final existingMatch = await _firestore
+    final existingMatches = await _firestore
         .collection('matches')
         .where('clientId', isEqualTo: user.uid)
-        .where('serviceId', isEqualTo: serviceId)
+        .where('serviceId', isEqualTo: service.id)
         .get();
-
-    final activeMatchExists = existingMatch.docs.any(
+    if (existingMatches.docs.any(
       (doc) => doc.data()['status'] != 'cancelled',
-    );
-
-    if (activeMatchExists) {
+    )) {
       throw Exception('Ya has solicitado este servicio previamente.');
     }
 
-    // SOLUCIÓN #3: Obtener el nombre del cliente desde su perfil
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final clientName = userDoc.data()?['name'] ?? 'Usuario Desconocido';
-
+    final userSnapshot = await _firestore.collection('users').doc(user.uid).get();
     final docRef = _firestore.collection('matches').doc();
-
-    final newMatch = MatchModel(
+    final request = MatchModel(
       id: docRef.id,
-      serviceId: serviceId,
+      serviceId: service.id,
       clientId: user.uid,
-      clientName: clientName, // Guardamos el nombre en el Match
-      providerId: providerId,
+      clientName: userSnapshot.data()?['name']?.toString() ?? 'Cliente',
+      providerId: service.providerId,
       serviceAddress: serviceAddress,
-      serviceTitle: service?.title,
-      serviceDescription: service?.description,
-      servicePrice: service?.price,
-      serviceCategory: service?.category,
+      serviceTitle: service.title,
+      serviceDescription: service.description,
+      servicePrice: service.price,
+      serviceCategory: service.category,
       paymentMethod: paymentMethod,
     );
 
-    await docRef.set(newMatch.toMap());
+    await docRef.set(request.toMap());
   }
 
   Future<void> cancelMatch(String matchId) async {

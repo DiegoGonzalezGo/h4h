@@ -8,6 +8,7 @@ import '../data/services_repository.dart';
 import '../../matches/data/matches_repository.dart';
 import '../../users/data/address_model.dart';
 import '../../users/data/user_repository.dart';
+import 'checkout_screen.dart';
 import 'service_card.dart';
 
 // Lo convertimos a Stateful para manejar el texto de búsqueda y la categoría seleccionada
@@ -229,6 +230,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
   }
 
   void _showServiceModal(BuildContext context, dynamic match) {
+    final pageContext = context;
     AddressModel? selectedAddress;
 
     showDialog<void>(
@@ -480,33 +482,40 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                             )
                           else
                             InkWell(
-                              onTap: isRequested || selectedAddress == null
+                              onTap: isRequested
                                   ? null
-                                  : () async {
-                                      try {
-                                        await modalRef
-                                            .read(matchesRepositoryProvider)
-                                            .requestService(
-                                              match.id,
-                                              match.providerId,
-                                              serviceAddress: selectedAddress,
-                                            );
-                                      } catch (error) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    error.toString().replaceAll(
-                                                      'Exception: ',
-                                                      '',
-                                                    ),
-                                                  ),
-                                                  backgroundColor: Colors.red,
+                                  : () {
+                                      final address = selectedAddress;
+                                      if (address == null) {
+                                        ScaffoldMessenger.of(pageContext)
+                                          ..hideCurrentSnackBar()
+                                          ..showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Selecciona una dirección',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        return;
+                                      }
+
+                                      Navigator.of(dialogContext).pop();
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            if (pageContext.mounted) {
+                                              Navigator.of(pageContext).push(
+                                                MaterialPageRoute<void>(
+                                                  builder: (context) =>
+                                                      CheckoutScreen(
+                                                        servicio: match,
+                                                        selectedAddress:
+                                                            address,
+                                                      ),
                                                 ),
                                               );
-                                        }
-                                      }
+                                            }
+                                          });
                                     },
                               borderRadius: BorderRadius.circular(10),
                               child: Ink(

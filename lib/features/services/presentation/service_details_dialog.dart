@@ -16,6 +16,7 @@ Future<void> showServiceDetailsDialog({
   required WidgetRef ref,
   required ServiceModel service,
 }) async {
+  final navigationContext = context;
   AddressModel? selectedAddress;
 
   await showDialog<void>(
@@ -254,24 +255,27 @@ Future<void> showServiceDetailsDialog({
                                 ? null
                                 : () {
                                     if (selectedAddress == null) {
-                                      ScaffoldMessenger.of(context)
+                                      ScaffoldMessenger.of(navigationContext)
                                         ..hideCurrentSnackBar()
                                         ..showSnackBar(
                                           const SnackBar(
-                                            content: Text('Selecciona una dirección'),
+                                            content: Text(
+                                              'Selecciona una dirección',
+                                            ),
                                             backgroundColor: Colors.red,
                                           ),
                                         );
                                       return;
                                     }
 
-                                    Navigator.pop(context);
+                                    final address = selectedAddress!;
+                                    Navigator.pop(dialogContext);
                                     Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
+                                      navigationContext,
+                                      MaterialPageRoute<void>(
                                         builder: (context) => CheckoutScreen(
                                           servicio: service,
-                                          selectedAddress: selectedAddress!,
+                                          selectedAddress: address,
                                         ),
                                       ),
                                     );
