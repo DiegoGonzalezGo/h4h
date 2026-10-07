@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -153,10 +152,7 @@ class WalletScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const Text(
-                  '12/28',
-                  style: TextStyle(color: Colors.white70),
-                ),
+                const Text('12/28', style: TextStyle(color: Colors.white70)),
               ],
             ),
           ),
@@ -165,9 +161,7 @@ class WalletScreen extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => _showComingSoon(context, 'Agregar tarjetas'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.cyanAccent,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.cyanAccent),
               icon: const Icon(Icons.add),
               label: const Text('Agregar método de pago'),
             ),
@@ -194,7 +188,7 @@ class _WalletMovements extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final transactionsAsync = ref.watch(walletTransactionsProvider);
+    final transactionsAsync = ref.watch(transactionsProvider);
     final currencyFormat = NumberFormat.currency(
       locale: 'es_MX',
       name: 'MXN',
@@ -218,7 +212,7 @@ class _WalletMovements extends ConsumerWidget {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Text(
-              'Aún no tienes movimientos.',
+              'No hay movimientos recientes',
               style: TextStyle(color: Colors.white54),
             ),
           );
@@ -229,18 +223,13 @@ class _WalletMovements extends ConsumerWidget {
             for (var index = 0; index < transactions.length; index++) ...[
               if (index > 0) const Divider(color: Color(0xFF2C2C2C), height: 1),
               _WalletMovementTile(
-                icon: (transactions[index]['amount'] as num).toDouble() < 0
-                    ? Icons.lock_outline
-                    : Icons.account_balance_wallet_outlined,
-                title:
-                    transactions[index]['description']?.toString() ??
-                    'Movimiento de billetera',
-                subtitle: _formatDate(transactions[index]['createdAt']),
-                amount: currencyFormat.format(
-                  (transactions[index]['amount'] as num).toDouble().abs(),
-                ),
-                isDebit:
-                    (transactions[index]['amount'] as num).toDouble() < 0,
+                icon: transactions[index].isPositive
+                    ? Icons.account_balance_wallet_outlined
+                    : Icons.lock_outline,
+                title: transactions[index].title,
+                subtitle: _formatDate(transactions[index].createdAt),
+                amount: currencyFormat.format(transactions[index].amount.abs()),
+                isPositive: transactions[index].isPositive,
               ),
             ],
           ],
@@ -249,9 +238,7 @@ class _WalletMovements extends ConsumerWidget {
     );
   }
 
-  String _formatDate(Object? value) {
-    if (value is! Timestamp) return 'Fecha pendiente';
-    final date = value.toDate();
+  String _formatDate(DateTime date) {
     final today = DateTime.now();
     final dateOnly = DateTime(date.year, date.month, date.day);
     final todayOnly = DateTime(today.year, today.month, today.day);
@@ -268,14 +255,14 @@ class _WalletMovementTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.amount,
-    required this.isDebit,
+    required this.isPositive,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final String amount;
-  final bool isDebit;
+  final bool isPositive;
 
   @override
   Widget build(BuildContext context) {
@@ -294,9 +281,9 @@ class _WalletMovementTile extends StatelessWidget {
       ),
       subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54)),
       trailing: Text(
-        '${isDebit ? '- ' : '+ '}$amount',
+        '${isPositive ? '+ ' : '- '}$amount',
         style: TextStyle(
-          color: isDebit ? Colors.orangeAccent : Colors.greenAccent,
+          color: isPositive ? Colors.greenAccent : Colors.orangeAccent,
           fontWeight: FontWeight.bold,
         ),
       ),

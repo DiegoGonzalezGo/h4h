@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../users/data/user_model.dart';
 
+import '../../users/data/user_model.dart';
 
 class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -16,18 +16,23 @@ class AuthRepository {
         email: email,
         password: password,
       );
-      
+
       // Prepara los datos para Firestore
       UserModel newUser = UserModel(
         uid: credential.user!.uid, // Obtenemos el ID único generado por Auth
         name: name,
         email: email,
-        roles: ['client'], // Todo usuario nuevo empieza siendo cliente por defecto
+        roles: [
+          'client',
+        ], // Todo usuario nuevo empieza siendo cliente por defecto
+        balance: UserModel.defaultBalance,
       );
 
       // Guarda el perfil en la colección 'users'
-      await _firestore.collection('users').doc(newUser.uid).set(newUser.toMap());
-      
+      await _firestore
+          .collection('users')
+          .doc(newUser.uid)
+          .set(newUser.toMap());
     } catch (e) {
       throw Exception('Error al registrar: $e');
     }
@@ -41,7 +46,7 @@ class AuthRepository {
       throw Exception('Error al iniciar sesión: $e');
     }
   }
-  
+
   // 3. Cerrar sesión
   Future<void> signOut() async {
     await _auth.signOut();
@@ -49,7 +54,9 @@ class AuthRepository {
 }
 
 // Exponemos el repositorio usando Riverpod para poder llamarlo desde la Interfaz
-final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository());
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => AuthRepository(),
+);
 // Este provider emitirá eventos automáticos cuando el usuario inicie o cierre sesión
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();

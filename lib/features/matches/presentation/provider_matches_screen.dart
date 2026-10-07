@@ -106,10 +106,27 @@ class _ProviderMatchesScreenState extends ConsumerState<ProviderMatchesScreen> {
                             .read(matchesRepositoryProvider)
                             .updateMatchStatus(match.id, 'accepted');
                       },
-                      onReject: () {
-                        ref
-                            .read(matchesRepositoryProvider)
-                            .updateMatchStatus(match.id, 'rejected');
+                      onReject: () async {
+                        try {
+                          await ref
+                              .read(matchesRepositoryProvider)
+                              .cancelAndRefundService(
+                                requestId: match.id,
+                                clientId: match.clientId,
+                                amount: match.servicePrice ?? 0,
+                                providerRejected: true,
+                              );
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'No se pudo rechazar la solicitud: $error',
+                                ),
+                              ),
+                            );
+                          }
+                        }
                       },
                     );
                   },

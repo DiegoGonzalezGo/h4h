@@ -85,17 +85,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         return;
       }
 
+      final matchesRepository = ref.read(matchesRepositoryProvider);
+      final requestId = matchesRepository.createRequestId();
       await ref
           .read(currentUserControllerProvider.notifier)
           .deductBalance(
             widget.servicio.price,
-            description: 'Pago retenido - ${widget.servicio.title}',
+            description: 'Pago retenido - Servicio',
+            requestId: requestId,
           );
       balanceDeducted = true;
 
       await ref
           .read(matchesRepositoryProvider)
           .requestService(
+            requestId: requestId,
             service: widget.servicio,
             serviceAddress: widget.selectedAddress,
             paymentMethod: 'Tarjeta Simulada',

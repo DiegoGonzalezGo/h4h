@@ -103,7 +103,7 @@ class _ClientMatchesScreenState extends ConsumerState<ClientMatchesScreen> {
                     return _ClientRequestCard(
                       match: match,
                       isPending: selectedTabIndex == 0,
-                      onCancel: () => _showCancelDialog(context, match.id, ref),
+                      onCancel: () => _showCancelDialog(context, match, ref),
                       onRate: () {
                         showDialog(
                           context: context,
@@ -328,7 +328,7 @@ class _GradientChatButton extends StatelessWidget {
 
 Future<void> _showCancelDialog(
   BuildContext context,
-  String matchId,
+  MatchModel match,
   WidgetRef ref,
 ) async {
   final shouldCancel = await showDialog<bool>(
@@ -351,7 +351,13 @@ Future<void> _showCancelDialog(
 
   if (shouldCancel == true) {
     try {
-      await ref.read(matchesRepositoryProvider).cancelMatch(matchId);
+      await ref
+          .read(matchesRepositoryProvider)
+          .cancelAndRefundService(
+            requestId: match.id,
+            clientId: match.clientId,
+            amount: match.servicePrice ?? 0,
+          );
       ref.invalidate(clientActiveMatchesProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(

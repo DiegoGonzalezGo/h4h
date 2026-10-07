@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/data/auth_repository.dart';
 import 'address_model.dart';
+import 'transaction_model.dart';
 import 'user_model.dart';
 
 final userRepositoryProvider = Provider((ref) => UserRepository());
@@ -41,20 +42,27 @@ final currentUserControllerProvider =
       CurrentUserController.new,
     );
 
-final walletTransactionsProvider = StreamProvider<List<Map<String, dynamic>>>((
-  ref,
-) {
+final transactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
 
   return FirebaseFirestore.instance
       .collection('users')
       .doc(user.uid)
-      .collection('walletTransactions')
+      .collection('transactions')
       .orderBy('createdAt', descending: true)
       .limit(20)
       .snapshots()
-      .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+      .map(
+        (snapshot) => snapshot.docs
+            .map(
+              (doc) => TransactionModel.fromMap(
+                doc.data(),
+                documentId: doc.id,
+              ),
+            )
+            .toList(),
+      );
 });
 
 class CurrentUserController extends StreamNotifier<UserModel?> {
@@ -78,6 +86,7 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
   Future<void> deductBalance(
     double amount, {
     required String description,
+    required String requestId,
   }) async {
     if (amount <= 0) {
       throw ArgumentError.value(amount, 'amount', 'Debe ser mayor que cero.');
@@ -114,18 +123,22 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
 
         final nextBalance = balance - amount;
         if (storedBalance is num) {
-          transaction.update(userRef, {
-            'balance': FieldValue.increment(-amount),
-          });
+          transaction.set(
+            userRef,
+            {'balance': FieldValue.increment(-amount)},
+            SetOptions(merge: true),
+          );
         } else {
           transaction.set(userRef, {
             'balance': nextBalance,
           }, SetOptions(merge: true));
         }
-        final transactionRef = userRef.collection('walletTransactions').doc();
+        final transactionRef = userRef.collection('transactions').doc();
         transaction.set(transactionRef, {
-          'amount': -amount,
-          'description': description,
+          'title': description,
+          'amount': amount,
+          'isPositive': false,
+          'requestId': requestId,
           'createdAt': FieldValue.serverTimestamp(),
         });
         return nextBalance;
@@ -162,10 +175,11 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
         }
 
         transaction.update(userRef, {'balance': FieldValue.increment(amount)});
-        final transactionRef = userRef.collection('walletTransactions').doc();
+        final transactionRef = userRef.collection('transactions').doc();
         transaction.set(transactionRef, {
+          'title': 'Reembolso por solicitud no completada',
           'amount': amount,
-          'description': 'Reembolso por solicitud no completada',
+          'isPositive': true,
           'createdAt': FieldValue.serverTimestamp(),
         });
       });

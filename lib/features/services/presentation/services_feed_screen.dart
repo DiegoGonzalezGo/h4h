@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../data/services_repository.dart';
 import '../../matches/data/matches_repository.dart';
+import '../../matches/data/match_model.dart';
 import '../../users/data/address_model.dart';
 import '../../users/data/user_repository.dart';
 import 'checkout_screen.dart';
@@ -36,7 +37,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
     super.initState();
   }
 
-  Future<void> _showCancelDialog(BuildContext context, String matchId) async {
+  Future<void> _showCancelDialog(BuildContext context, MatchModel match) async {
     final shouldCancel = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -60,7 +61,13 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
     if (shouldCancel != true) return;
 
     try {
-      await ref.read(matchesRepositoryProvider).cancelMatch(matchId);
+      await ref
+          .read(matchesRepositoryProvider)
+          .cancelAndRefundService(
+            requestId: match.id,
+            clientId: match.clientId,
+            amount: match.servicePrice ?? 0,
+          );
       ref.invalidate(clientActiveMatchesProvider);
 
       if (context.mounted) {
@@ -465,10 +472,8 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                 ),
                                 const SizedBox(width: 12),
                                 TextButton.icon(
-                                  onPressed: () => _showCancelDialog(
-                                    context,
-                                    existingMatch.id,
-                                  ),
+                                  onPressed: () =>
+                                      _showCancelDialog(context, existingMatch),
                                   icon: const Icon(
                                     Icons.cancel_outlined,
                                     color: Colors.redAccent,

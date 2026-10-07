@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/user_repository.dart';
 import '../data/provider_mode.dart';
+import 'earnings_statistics_screen.dart';
 import 'wallet_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -204,15 +205,12 @@ class ProfileScreen extends ConsumerWidget {
           title: const Text('Mis Ganancias / Estadísticas'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Ruta a Mis Ganancias / Estadísticas
-          },
-        ),
-        ListTile(
-          leading: _brandIcon(Icons.calendar_month),
-          title: const Text('Horarios y Disponibilidad'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            // TODO: Ruta a Horarios y Disponibilidad
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => const EarningsStatisticsScreen(),
+              ),
+            );
           },
         ),
       ],

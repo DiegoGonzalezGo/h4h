@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../matches/data/matches_repository.dart';
+import '../../matches/data/match_model.dart';
 import '../../users/data/address_model.dart';
 import '../../users/data/user_repository.dart';
 import 'checkout_screen.dart';
@@ -229,7 +230,7 @@ Future<void> showServiceDetailsDialog({
                                 onPressed: () => _cancelPendingRequest(
                                   context,
                                   dialogRef,
-                                  existingMatch.id,
+                                  existingMatch,
                                 ),
                                 icon: const Icon(
                                   Icons.cancel_outlined,
@@ -297,7 +298,7 @@ Future<void> showServiceDetailsDialog({
 Future<void> _cancelPendingRequest(
   BuildContext context,
   WidgetRef ref,
-  String matchId,
+  MatchModel match,
 ) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -320,7 +321,13 @@ Future<void> _cancelPendingRequest(
   if (confirmed != true) return;
 
   try {
-    await ref.read(matchesRepositoryProvider).cancelMatch(matchId);
+    await ref
+        .read(matchesRepositoryProvider)
+        .cancelAndRefundService(
+          requestId: match.id,
+          clientId: match.clientId,
+          amount: match.servicePrice ?? 0,
+        );
     ref.invalidate(clientActiveMatchesProvider);
   } catch (error) {
     if (context.mounted) {

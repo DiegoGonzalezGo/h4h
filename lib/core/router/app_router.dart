@@ -18,45 +18,28 @@ import '../../features/matches/presentation/history_screen.dart';
 import '../../features/services/presentation/top_providers_screen.dart';
 import '../../features/users/presentation/edit_profile_screen.dart';
 import '../../features/users/presentation/public_profile_screen.dart';
-import '../../features/users/data/user_repository.dart';
 import '../../features/auth/presentation/banned_screen.dart';
 
-// Convertimos el enrutador en un Provider
 final goRouterProvider = Provider<GoRouter>((ref) {
-  // 1. Riverpod vigila el estado de Firebase Auth en tiempo real
-  final authState = ref.watch(authStateProvider);
-  final currentUserData = ref.watch(currentUserStreamProvider);
+  var authState = ref.read(authStateProvider);
 
-  return GoRouter(
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: '/login',
-
-    // 2. El redirect se ejecuta mágicamente CADA VEZ que el authState cambia
     redirect: (context, state) {
-      // Si Firebase todavía está pensando, no hacemos nada
       if (authState.isLoading || authState.hasError) return null;
 
       final isAuthenticated = authState.value != null;
       final isGoingToLogin = state.matchedLocation == '/login';
-      final isGoingToBanned = state.matchedLocation == '/banned';
 
-      if (isAuthenticated && currentUserData.hasValue) {
-        final isBanned = currentUserData.value?['isBanned'] == true;
-        if (isBanned && !isGoingToBanned) {
-          return '/banned';
-        }
-      }
-
-      // Regla A: Si NO está logueado y trata de entrar al feed (o a otra ruta) -> Bloquear y enviar al Login
       if (!isAuthenticated && !isGoingToLogin) {
         return '/login';
       }
 
-      // Regla B: Si SÍ está logueado y por error abre la pantalla de Login -> Enviar directo al Feed
       if (isAuthenticated && isGoingToLogin) {
         return '/feed';
       }
 
-      // Todo está en orden, permitir el paso a la ruta original
       return null;
     },
     routes: [
@@ -158,4 +141,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  ref.listen(authStateProvider, (previous, next) {
+    authState = next;
+    router.refresh();
+  });
+  ref.onDispose(router.dispose);
+
+  return router;
 });
