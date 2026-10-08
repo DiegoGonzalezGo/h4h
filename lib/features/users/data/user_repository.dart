@@ -56,10 +56,7 @@ final transactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
       .map(
         (snapshot) => snapshot.docs
             .map(
-              (doc) => TransactionModel.fromMap(
-                doc.data(),
-                documentId: doc.id,
-              ),
+              (doc) => TransactionModel.fromMap(doc.data(), documentId: doc.id),
             )
             .toList(),
       );
@@ -67,6 +64,7 @@ final transactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
 
 class CurrentUserController extends StreamNotifier<UserModel?> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   @override
   Stream<UserModel?> build() {
@@ -81,6 +79,45 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
           final data = snapshot.data();
           return data == null ? null : UserModel.fromMap(data, snapshot.id);
         });
+  }
+
+  Future<void> completeProviderSetup({
+    required String bio,
+    required List<String> skills,
+    required File profilePhoto,
+  }) async {
+    final currentUser = state.value;
+    if (currentUser == null) {
+      throw StateError('No se encontró el perfil del usuario.');
+    }
+
+    try {
+      final storageRef = _storage
+          .ref()
+          .child('avatars')
+          .child('${currentUser.uid}.jpg');
+      await storageRef.putFile(profilePhoto);
+      final photoUrl = await storageRef.getDownloadURL();
+
+      final updatedUser = currentUser.copyWith(
+        bio: bio,
+        skills: skills,
+        profilePictureUrl: photoUrl,
+        isProviderSetupComplete: true,
+      );
+      state = AsyncData(updatedUser);
+
+      await _firestore.collection('users').doc(currentUser.uid).update({
+        'bio': bio,
+        'skills': skills,
+        'profilePictureUrl': photoUrl,
+        'photoUrl': photoUrl,
+        'isProviderSetupComplete': true,
+      });
+    } catch (error, stackTrace) {
+      state = AsyncData(currentUser);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<void> deductBalance(
@@ -123,11 +160,9 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
 
         final nextBalance = balance - amount;
         if (storedBalance is num) {
-          transaction.set(
-            userRef,
-            {'balance': FieldValue.increment(-amount)},
-            SetOptions(merge: true),
-          );
+          transaction.set(userRef, {
+            'balance': FieldValue.increment(-amount),
+          }, SetOptions(merge: true));
         } else {
           transaction.set(userRef, {
             'balance': nextBalance,

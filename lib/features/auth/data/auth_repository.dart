@@ -9,7 +9,12 @@ class AuthRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // 1. Registro de nuevo usuario
-  Future<void> signUp(String email, String password, String name) async {
+  Future<void> signUp(
+    String email,
+    String password,
+    String name,
+    String phone,
+  ) async {
     try {
       // Crea el usuario en Firebase Auth
       UserCredential credential = await _auth.createUserWithEmailAndPassword(
@@ -22,6 +27,7 @@ class AuthRepository {
         uid: credential.user!.uid, // Obtenemos el ID único generado por Auth
         name: name,
         email: email,
+        phone: phone,
         roles: [
           'client',
         ], // Todo usuario nuevo empieza siendo cliente por defecto
@@ -32,7 +38,10 @@ class AuthRepository {
       await _firestore
           .collection('users')
           .doc(newUser.uid)
-          .set(newUser.toMap());
+          .set({
+            ...newUser.toMap(),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
     } catch (e) {
       throw Exception('Error al registrar: $e');
     }

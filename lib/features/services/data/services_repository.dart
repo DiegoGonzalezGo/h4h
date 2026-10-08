@@ -59,6 +59,27 @@ class ServicesRepository {
   Future<void> deleteService(String serviceId) async {
     await _firestore.collection('services').doc(serviceId).delete();
   }
+
+  Future<List<ServiceModel>> fetchAvailableServices({String? category}) async {
+    Query<Map<String, dynamic>> query = _firestore
+        .collection('services')
+        .where('isActive', isEqualTo: true);
+    final selectedCategory = category?.trim();
+    if (selectedCategory != null &&
+        selectedCategory.isNotEmpty &&
+        selectedCategory != 'Todas') {
+      query = query.where('category', isEqualTo: selectedCategory);
+    }
+
+    final snapshot = await query.get();
+    final currentUserId = _auth.currentUser?.uid;
+
+    final services = snapshot.docs
+        .map((doc) => ServiceModel.fromMap(doc.data(), doc.id))
+        .where((service) => service.providerId != currentUserId)
+        .toList();
+    return services;
+  }
 } // <-- Fin de la clase
 
 // ¡ESTA ES LA LÍNEA QUE FALTABA! Exponemos el repositorio para que la interfaz lo pueda usar

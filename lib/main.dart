@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -9,15 +11,22 @@ import 'features/notifications/notifications_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   final notificationsService = NotificationsService();
-  await notificationsService.initialize();
 
-  // 3. Envolvemos MyApp en ProviderScope para poder usar Riverpod en toda la aplicación
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(
+      notificationsService.initialize().catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        debugPrint('No se pudieron inicializar las notificaciones: $error');
+      }),
+    );
+  });
+
   runApp(
     ProviderScope(
       overrides: [
@@ -35,9 +44,8 @@ class MyApp extends ConsumerWidget {
   // Agregamos el parámetro WidgetRef
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    
     // Obtenemos nuestro enrutador protegido
-    final router = ref.watch(goRouterProvider); 
+    final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
       title: 'Directorio de Servicios',

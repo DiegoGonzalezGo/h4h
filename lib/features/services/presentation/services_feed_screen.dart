@@ -11,6 +11,7 @@ import '../../users/data/address_model.dart';
 import '../../users/data/user_repository.dart';
 import 'checkout_screen.dart';
 import 'service_card.dart';
+import 'service_match_screen.dart';
 
 // Lo convertimos a Stateful para manejar el texto de búsqueda y la categoría seleccionada
 class ServicesFeedScreen extends ConsumerStatefulWidget {
@@ -108,10 +109,28 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Padding(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) => ServiceMatchScreen(
+                categoriaBuscada: _selectedCategory == 'Todas'
+                    ? null
+                    : _selectedCategory,
+              ),
+            ),
+          );
+        },
+        backgroundColor: const Color(0xFF6A11CB),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.auto_awesome),
+        label: const Text('Match Inteligente'),
+      ),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
@@ -142,8 +161,9 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                 ],
               ),
             ),
-
-            const Padding(
+          ),
+          const SliverToBoxAdapter(
+            child: Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 10),
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -153,7 +173,9 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                 ),
               ),
             ),
-            SizedBox(
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
               height: 40,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -178,9 +200,10 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 24),
-
-            const Padding(
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          const SliverToBoxAdapter(
+            child: Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -190,48 +213,52 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                 ),
               ),
             ),
-            servicesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, stack) => Center(child: Text('Error: $e')),
-              data: (services) {
-                // AQUÍ APLICAMOS EL FILTRO EN TIEMPO REAL
-                final filteredServices = services.where((service) {
-                  // Filtro por texto
-                  final matchesSearch =
-                      service.title.toLowerCase().contains(_searchQuery) ||
-                      service.description.toLowerCase().contains(_searchQuery);
-                  // Filtro por categoría
-                  final matchesCategory =
-                      _selectedCategory == 'Todas' ||
-                      service.category == _selectedCategory;
+          ),
+          servicesAsync.when(
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, stack) => SliverToBoxAdapter(
+              child: Center(child: Text('Error: $e')),
+            ),
+            data: (services) {
+              final filteredServices = services.where((service) {
+                final matchesSearch =
+                    service.title.toLowerCase().contains(_searchQuery) ||
+                    service.description.toLowerCase().contains(_searchQuery);
+                final matchesCategory =
+                    _selectedCategory == 'Todas' ||
+                    service.category == _selectedCategory;
 
-                  return matchesSearch && matchesCategory;
-                }).toList();
+                return matchesSearch && matchesCategory;
+              }).toList();
 
-                if (filteredServices.isEmpty) {
-                  return const Center(
+              if (filteredServices.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
                     child: Text('No se encontraron servicios.'),
-                  );
-                }
+                  ),
+                );
+              }
 
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+              return SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList.builder(
                   itemCount: filteredServices.length,
                   itemBuilder: (context, index) {
                     final service = filteredServices[index];
-
                     return ServiceCard(
                       service: service,
                       onTap: () => _showServiceModal(context, service),
                     );
                   },
-                );
-              },
-            ),
-          ],
-        ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

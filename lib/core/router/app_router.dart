@@ -6,6 +6,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/services/presentation/services_feed_screen.dart';
 import '../../features/services/presentation/saved_services_screen.dart';
 import '../../features/services/presentation/checkout_screen.dart';
+import '../../features/services/presentation/service_match_screen.dart';
 import '../../features/users/presentation/my_addresses_screen.dart';
 import '../../features/auth/data/auth_repository.dart'; // Importamos el espía que acabamos de crear
 import '../../features/users/presentation/profile_screen.dart';
@@ -97,6 +98,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/saved-services',
         builder: (context, state) => const SavedServicesScreen(),
+      ),
+      GoRoute(
+        path: '/service-match',
+        builder: (context, state) => ServiceMatchScreen(
+          categoriaBuscada: state.extra as String?,
+        ),
       ),
       GoRoute(
         path: '/confirm-request',
