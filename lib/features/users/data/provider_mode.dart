@@ -4,8 +4,12 @@ class ProviderMode extends Notifier<bool> {
   @override
   bool build() => false;
 
-  void toggleMode(bool isProvider) {
+  void setMode(bool isProvider) {
     state = isProvider;
+  }
+
+  void toggleMode(bool isProvider) {
+    setMode(isProvider);
   }
 }
 

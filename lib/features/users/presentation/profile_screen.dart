@@ -74,9 +74,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authRepositoryProvider).signOut();
-              context.go('/login');
+            onPressed: () async {
+              try {
+                await ref.read(authRepositoryProvider).signOut();
+                if (context.mounted) context.go('/login');
+              } catch (error) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('No se pudo cerrar sesión: $error')),
+                  );
+                }
+              }
             },
           ),
         ],

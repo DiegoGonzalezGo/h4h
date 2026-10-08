@@ -2,9 +2,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../users/data/provider_mode.dart';
 import '../../users/data/user_model.dart';
 
 class AuthRepository {
+  AuthRepository(this._ref);
+
+  final Ref _ref;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -42,6 +46,7 @@ class AuthRepository {
             ...newUser.toMap(),
             'createdAt': FieldValue.serverTimestamp(),
           });
+      _ref.read(providerModeProvider.notifier).setMode(false);
     } catch (e) {
       throw Exception('Error al registrar: $e');
     }
@@ -59,12 +64,13 @@ class AuthRepository {
   // 3. Cerrar sesión
   Future<void> signOut() async {
     await _auth.signOut();
+    _ref.read(providerModeProvider.notifier).setMode(false);
   }
 }
 
 // Exponemos el repositorio usando Riverpod para poder llamarlo desde la Interfaz
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(),
+  (ref) => AuthRepository(ref),
 );
 // Este provider emitirá eventos automáticos cuando el usuario inicie o cierre sesión
 final authStateProvider = StreamProvider<User?>((ref) {

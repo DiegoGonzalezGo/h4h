@@ -1,19 +1,21 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class BannedScreen extends StatelessWidget {
+import '../data/auth_repository.dart';
+
+class BannedScreen extends ConsumerWidget {
   const BannedScreen({super.key});
 
-  Future<void> _signOut(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    await ref.read(authRepositoryProvider).signOut();
     if (context.mounted) {
       context.go('/login');
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -40,7 +42,7 @@ class BannedScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 FilledButton.icon(
-                  onPressed: () => _signOut(context),
+                  onPressed: () => _signOut(context, ref),
                   icon: const Icon(Icons.logout),
                   label: const Text('Cerrar sesión'),
                 ),
