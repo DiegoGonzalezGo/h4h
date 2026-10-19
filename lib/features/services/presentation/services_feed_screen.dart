@@ -30,7 +30,8 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
     'Educación',
     'Hogar',
     'Salud',
-    'General',
+    'Belleza',
+    'Deportes',
   ];
 
   @override
@@ -176,7 +177,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
           ),
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 40,
+              height: 48,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -187,14 +188,38 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ChoiceChip(
-                      label: Text(category),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => _selectedCategory = category);
-                        }
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedCategory = category);
                       },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected ? null : const Color(0xFF2C2C2C),
+                          gradient: isSelected
+                              ? const LinearGradient(
+                                  colors: [
+                                    Colors.purpleAccent,
+                                    Colors.blueAccent,
+                                  ],
+                                )
+                              : null,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -219,9 +244,8 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               hasScrollBody: false,
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, stack) => SliverToBoxAdapter(
-              child: Center(child: Text('Error: $e')),
-            ),
+            error: (e, stack) =>
+                SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
             data: (services) {
               final filteredServices = services.where((service) {
                 final matchesSearch =
@@ -237,9 +261,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               if (filteredServices.isEmpty) {
                 return const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Text('No se encontraron servicios.'),
-                  ),
+                  child: Center(child: Text('No se encontraron servicios.')),
                 );
               }
 
