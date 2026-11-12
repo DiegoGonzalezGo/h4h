@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/user_repository.dart';
+import 'provider_portfolio_section.dart';
 import 'report_user_menu.dart';
 
 class PublicProfileScreen extends ConsumerWidget {
@@ -105,6 +106,8 @@ class PublicProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(bio, style: const TextStyle(fontSize: 16, height: 1.5)),
+              const SizedBox(height: 24),
+              ProviderPortfolioSection(providerUid: userId),
             ],
           );
         },

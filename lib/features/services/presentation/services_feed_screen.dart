@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/services_repository.dart';
+import '../data/service_model.dart';
 import '../../matches/data/matches_repository.dart';
 import '../../matches/data/match_model.dart';
 import '../../users/data/address_model.dart';
@@ -24,7 +28,10 @@ class ServicesFeedScreen extends ConsumerStatefulWidget {
 class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
   String _searchQuery = '';
   String _selectedCategory = 'Todas';
-  final List<String> _categories = [
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+
+  static const List<String> _categories = [
     'Todas',
     'Tecnología',
     'Educación',
@@ -35,8 +42,20 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _updateSearch(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      final query = value.trim().toLowerCase();
+      if (_searchQuery == query) return;
+      setState(() => _searchQuery = query);
+    });
   }
 
   Future<void> _showCancelDialog(BuildContext context, MatchModel match) async {
@@ -89,6 +108,15 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
   @override
   Widget build(BuildContext context) {
     final servicesAsync = ref.watch(activeServicesProvider);
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final unreadNotificationsStream = currentUserId == null
+        ? null
+        : FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUserId)
+              .collection('notificaciones')
+              .where('leida', isEqualTo: false)
+              .snapshots();
 
     return Scaffold(
       appBar: AppBar(
@@ -101,11 +129,177 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               context.push('/ranking');
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, size: 28),
-            tooltip: 'Mi Perfil',
-            onPressed: () {
-              context.push('/profile'); // Navega a la pantalla de perfil
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: unreadNotificationsStream,
+            builder: (context, snapshot) {
+              final hasUnreadNotifications =
+                  snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+              final icon = hasUnreadNotifications
+                  ? Badge(
+                      backgroundColor: Colors.redAccent,
+                      label: Text(snapshot.data!.docs.length.toString()),
+                      child: const Icon(
+                        Icons.notifications_none_rounded,
+                        size: 28,
+                      ),
+                    )
+                  : const Icon(Icons.notifications_none_rounded, size: 28);
+
+              return IconButton(
+                icon: icon,
+                tooltip: snapshot.hasError
+                    ? 'Error al cargar notificaciones'
+                    : 'Notificaciones',
+                onPressed: () {
+                  showModalBottomSheet<void>(
+                    context: context,
+                    backgroundColor: Colors.grey[900],
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
+                    ),
+                    builder: (context) => SizedBox(
+                      height: 480,
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Notificaciones',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: currentUserId == null
+                                    ? const Center(
+                                        child: Text(
+                                          'Inicia sesión para ver tus notificaciones',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white54,
+                                          ),
+                                        ),
+                                      )
+                                    : StreamBuilder<
+                                        QuerySnapshot<Map<String, dynamic>>
+                                      >(
+                                        stream: FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(currentUserId)
+                                            .collection('notificaciones')
+                                            .orderBy(
+                                              'createdAt',
+                                              descending: true,
+                                            )
+                                            .snapshots(),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasError) {
+                                            return const Center(
+                                              child: Text(
+                                                'No se pudieron cargar las notificaciones.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          if (!snapshot.hasData) {
+                                            return const Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            );
+                                          }
+
+                                          final documents = snapshot.data!.docs;
+                                          if (documents.isEmpty) {
+                                            return const Center(
+                                              child: Text(
+                                                'No tienes notificaciones recientes',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                ),
+                                              ),
+                                            );
+                                          }
+
+                                          return ListView.builder(
+                                            itemCount: documents.length,
+                                            itemBuilder: (context, index) {
+                                              final document = documents[index];
+                                              final data = document.data();
+                                              final isUnread =
+                                                  data['leida'] == false;
+                                              final title =
+                                                  data['titulo'] is String
+                                                  ? data['titulo'] as String
+                                                  : '';
+                                              final message =
+                                                  data['mensaje'] is String
+                                                  ? data['mensaje'] as String
+                                                  : '';
+
+                                              return ListTile(
+                                                title: Text(
+                                                  title,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                subtitle: Text(
+                                                  message,
+                                                  style: const TextStyle(
+                                                    color: Colors.white70,
+                                                  ),
+                                                ),
+                                                tileColor: isUnread
+                                                    ? Colors.white10
+                                                    : null,
+                                                onTap: isUnread
+                                                    ? () async {
+                                                        try {
+                                                          await document
+                                                              .reference
+                                                              .update({
+                                                                'leida': true,
+                                                              });
+                                                        } catch (error) {
+                                                          if (context.mounted) {
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
+                                                              SnackBar(
+                                                                content: Text(
+                                                                  'No se pudo marcar la notificación como leída: $error',
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }
+                                                        }
+                                                      }
+                                                    : null,
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
             },
           ),
         ],
@@ -144,6 +338,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
+                      controller: _searchController,
                       decoration: InputDecoration(
                         hintText: 'Buscar servicios...',
                         prefixIcon: const Icon(Icons.search),
@@ -154,9 +349,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                           horizontal: 16,
                         ),
                       ),
-                      onChanged: (value) {
-                        setState(() => _searchQuery = value.toLowerCase());
-                      },
+                      onChanged: _updateSearch,
                     ),
                   ),
                 ],
@@ -249,6 +442,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
             data: (services) {
               final filteredServices = services.where((service) {
                 final matchesSearch =
+                    _searchQuery.isEmpty ||
                     service.title.toLowerCase().contains(_searchQuery) ||
                     service.description.toLowerCase().contains(_searchQuery);
                 final matchesCategory =
@@ -285,8 +479,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
     );
   }
 
-  void _showServiceModal(BuildContext context, dynamic match) {
-    final pageContext = context;
+  void _showServiceModal(BuildContext context, ServiceModel match) {
     AddressModel? selectedAddress;
 
     showDialog<void>(
@@ -541,7 +734,7 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                   : () {
                                       final address = selectedAddress;
                                       if (address == null) {
-                                        ScaffoldMessenger.of(pageContext)
+                                        ScaffoldMessenger.of(context)
                                           ..hideCurrentSnackBar()
                                           ..showSnackBar(
                                             const SnackBar(
@@ -557,8 +750,8 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                       Navigator.of(dialogContext).pop();
                                       WidgetsBinding.instance
                                           .addPostFrameCallback((_) {
-                                            if (pageContext.mounted) {
-                                              Navigator.of(pageContext).push(
+                                            if (context.mounted) {
+                                              Navigator.of(context).push(
                                                 MaterialPageRoute<void>(
                                                   builder: (context) =>
                                                       CheckoutScreen(

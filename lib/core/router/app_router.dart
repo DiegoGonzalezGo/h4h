@@ -20,6 +20,7 @@ import '../../features/services/presentation/top_providers_screen.dart';
 import '../../features/users/presentation/edit_profile_screen.dart';
 import '../../features/users/presentation/public_profile_screen.dart';
 import '../../features/auth/presentation/banned_screen.dart';
+import '../../features/users/presentation/wallet_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   var authState = ref.read(authStateProvider);
@@ -76,6 +77,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/wallet',
+                builder: (context, state) => const WalletScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
               ),
@@ -101,9 +110,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/service-match',
-        builder: (context, state) => ServiceMatchScreen(
-          categoriaBuscada: state.extra as String?,
-        ),
+        builder: (context, state) =>
+            ServiceMatchScreen(categoriaBuscada: state.extra as String?),
       ),
       GoRoute(
         path: '/confirm-request',

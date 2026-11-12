@@ -1,10 +1,9 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/address_model.dart';
 import '../data/user_repository.dart';
+import 'map_picker_screen.dart';
 
 class MyAddressesScreen extends ConsumerWidget {
   const MyAddressesScreen({super.key});
@@ -128,7 +127,18 @@ class MyAddressesScreen extends ConsumerWidget {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _GradientAddButton(
-        onPressed: () => _showAddAddressModal(context),
+        onPressed: () async {
+          final saved = await Navigator.of(context).push<bool>(
+            MaterialPageRoute<bool>(
+              builder: (context) => const MapPickerScreen(),
+            ),
+          );
+          if (saved == true && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Dirección guardada correctamente')),
+            );
+          }
+        },
       ),
     );
   }
@@ -185,224 +195,6 @@ class _GradientAddButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _showAddAddressModal(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => const AddAddressModal(),
-  );
-}
-
-class AddAddressModal extends ConsumerStatefulWidget {
-  const AddAddressModal({super.key});
-
-  @override
-  ConsumerState<AddAddressModal> createState() => _AddAddressModalState();
-}
-
-class _AddAddressModalState extends ConsumerState<AddAddressModal> {
-  final _aliasController = TextEditingController();
-  final _streetController = TextEditingController();
-  final _referenceController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-
-  bool _isSaving = false;
-  String? _errorText;
-
-  @override
-  void dispose() {
-    _aliasController.dispose();
-    _streetController.dispose();
-    _referenceController.dispose();
-    super.dispose();
-  }
-
-  InputDecoration _decoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: Colors.white54),
-      filled: true,
-      fillColor: const Color(0xFF151515),
-      border: InputBorder.none,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-    );
-  }
-
-  Future<void> _saveAddress() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final alias = _aliasController.text.trim();
-    final street = _streetController.text.trim();
-    final reference = _referenceController.text.trim();
-    final address = AddressModel(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      alias: alias,
-      street: street,
-      reference: reference,
-    );
-    final scaffold = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
-    setState(() {
-      _isSaving = true;
-      _errorText = null;
-    });
-
-    try {
-      await ref
-          .read(currentUserControllerProvider.notifier)
-          .addAddress(address);
-
-      if (!mounted) return;
-
-      scaffold
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Dirección guardada correctamente')),
-        );
-      navigator.pop();
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _errorText = 'No se pudo guardar: $error';
-        _isSaving = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: keyboardInset),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 38,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Nueva Dirección',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _aliasController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _decoration(
-                        'Alias (Ej. Casa, Oficina)',
-                        Icons.label_outline,
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Escribe un alias'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _streetController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _decoration(
-                        'Dirección completa (Calle y número)',
-                        Icons.location_on_outlined,
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Escribe la dirección completa'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _referenceController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _decoration(
-                        'Referencias (Ej. Portón negro)',
-                        Icons.info_outline,
-                      ),
-                    ),
-                    if (_errorText != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _errorText!,
-                        style: const TextStyle(color: Colors.redAccent),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: FilledButton(
-                          onPressed: _isSaving ? null : _saveAddress,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                          ),
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Guardar Dirección',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ),
         ),
       ),

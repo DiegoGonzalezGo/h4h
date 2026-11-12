@@ -266,12 +266,18 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
     state = AsyncData(currentUser.copyWith(addresses: updatedAddresses));
 
     try {
-      await FirebaseFirestore.instance
+      final userReference = FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser.uid)
-          .update({
-            'addresses': FieldValue.arrayUnion([newAddress.toMap()]),
-          });
+          .doc(currentUser.uid);
+      final batch = FirebaseFirestore.instance.batch()
+        ..update(userReference, {
+          'addresses': FieldValue.arrayUnion([newAddress.toMap()]),
+        })
+        ..set(
+          userReference.collection('addresses').doc(newAddress.id),
+          newAddress.toMap(),
+        );
+      await batch.commit();
     } catch (error, stackTrace) {
       state = AsyncData(currentUser);
       Error.throwWithStackTrace(error, stackTrace);
@@ -296,12 +302,15 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
     state = AsyncData(currentUser.copyWith(addresses: updatedAddresses));
 
     try {
-      await FirebaseFirestore.instance
+      final userReference = FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser.uid)
-          .update({
-            'addresses': FieldValue.arrayRemove([addressToRemove.toMap()]),
-          });
+          .doc(currentUser.uid);
+      final batch = FirebaseFirestore.instance.batch()
+        ..update(userReference, {
+          'addresses': FieldValue.arrayRemove([addressToRemove.toMap()]),
+        })
+        ..delete(userReference.collection('addresses').doc(addressId));
+      await batch.commit();
     } catch (error, stackTrace) {
       state = AsyncData(currentUser);
       Error.throwWithStackTrace(error, stackTrace);

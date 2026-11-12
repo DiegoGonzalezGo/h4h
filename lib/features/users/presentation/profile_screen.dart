@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,7 @@ import '../../auth/data/auth_repository.dart';
 import '../data/user_repository.dart';
 import '../data/provider_mode.dart';
 import 'earnings_statistics_screen.dart';
-import 'wallet_screen.dart';
+import 'portfolio_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -527,15 +528,380 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           },
         ),
         ListTile(
+          leading: _brandIcon(Icons.work_history_rounded),
+          title: const Text('Mi Portafolio / Certificados'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => const PortfolioScreen(),
+              ),
+            );
+          },
+        ),
+        ListTile(
           leading: _brandIcon(Icons.bar_chart),
           title: const Text('Mis Ganancias / Estadísticas'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => const EarningsStatisticsScreen(),
-              ),
+          onTap: () async {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user == null) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Colors.red,
+                    content: Text('Inicia sesión para continuar.'),
+                  ),
+                );
+              return;
+            }
+
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+            if (!context.mounted) return;
+            final isPremium = userDoc.data()?['isPremium'] == true;
+
+            if (isPremium) {
+              Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (context) => const EarningsStatisticsScreen(),
+                ),
+              );
+              return;
+            }
+
+            showModalBottomSheet<void>(
+              context: context,
+              backgroundColor: Colors.transparent,
+              isScrollControlled: true,
+              builder: (modalContext) {
+                return SafeArea(
+                  top: false,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 24),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.workspace_premium,
+                          color: Color(0xFFFFB74D),
+                          size: 72,
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Desbloquea SkillMatch Premium',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Accede a métricas avanzadas, historial detallado de ganancias y herramientas exclusivas para potenciar tus servicios.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.45,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          r'$599.00 MXN',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFFC107),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFF9800), Color(0xFFFFC107)],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x66FF9800),
+                                  blurRadius: 14,
+                                  offset: Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: Colors.black,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: () async {
+                                const premiumPrice = 599.0;
+                                final user = FirebaseAuth.instance.currentUser;
+
+                                if (user == null) {
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      const SnackBar(
+                                        backgroundColor: Colors.red,
+                                        content: Text(
+                                          'Inicia sesión para comprar Premium.',
+                                        ),
+                                      ),
+                                    );
+                                  return;
+                                }
+
+                                final userRef = FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user.uid);
+
+                                try {
+                                  final userDoc = await userRef.get();
+                                  // ignore: avoid_print
+                                  print('Datos del usuario: ${userDoc.data()}');
+                                  final data = userDoc.data();
+                                  final double saldoActual =
+                                      double.tryParse(
+                                        data?['balance']?.toString() ?? '0',
+                                      ) ??
+                                      0.0;
+
+                                  if (saldoActual < premiumPrice) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context)
+                                      ..hideCurrentSnackBar()
+                                      ..showSnackBar(
+                                        const SnackBar(
+                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            'Saldo insuficiente. Recarga tu billetera en la sección de pagos.',
+                                          ),
+                                        ),
+                                      );
+                                    return;
+                                  }
+
+                                  await FirebaseFirestore.instance
+                                      .runTransaction<void>((
+                                        transaction,
+                                      ) async {
+                                        final snapshot = await transaction.get(
+                                          userRef,
+                                        );
+                                        final transactionData = snapshot.data();
+                                        final currentBalance =
+                                            double.tryParse(
+                                              transactionData?['balance']
+                                                      ?.toString() ??
+                                                  '0',
+                                            ) ??
+                                            0.0;
+
+                                        if (currentBalance < premiumPrice) {
+                                          throw StateError(
+                                            'Saldo insuficiente',
+                                          );
+                                        }
+
+                                        transaction.update(userRef, {
+                                          'balance':
+                                              transactionData?['balance'] is num
+                                              ? FieldValue.increment(
+                                                  -premiumPrice,
+                                                )
+                                              : currentBalance - premiumPrice,
+                                          'isPremium': true,
+                                          'premiumActivatedAt':
+                                              FieldValue.serverTimestamp(),
+                                        });
+
+                                        final paymentRef = userRef
+                                            .collection('transactions')
+                                            .doc();
+                                        transaction.set(paymentRef, {
+                                          'title': 'Suscripción Premium',
+                                          'amount': premiumPrice,
+                                          'isPositive': false,
+                                          'requestId': 'premium_subscription',
+                                          'createdAt':
+                                              FieldValue.serverTimestamp(),
+                                        });
+                                      });
+
+                                  if (!modalContext.mounted) return;
+                                  Navigator.pop(modalContext);
+                                  if (!context.mounted) return;
+
+                                  showDialog<void>(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (dialogContext) {
+                                      return Dialog(
+                                        backgroundColor: const Color(
+                                          0xFF1E1E1E,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
+                                            vertical: 28,
+                                          ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              TweenAnimationBuilder<double>(
+                                                tween: Tween<double>(
+                                                  begin: 0,
+                                                  end: 1,
+                                                ),
+                                                duration: const Duration(
+                                                  milliseconds: 800,
+                                                ),
+                                                curve: Curves.elasticOut,
+                                                builder:
+                                                    (context, scale, child) {
+                                                      return Transform.scale(
+                                                        scale: scale,
+                                                        child: child,
+                                                      );
+                                                    },
+                                                child: const Icon(
+                                                  Icons.check_circle,
+                                                  color: Colors.greenAccent,
+                                                  size: 80,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              const Text(
+                                                '¡Suscripción Exitosa!',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              const Text(
+                                                'Ahora tienes acceso a todas las estadísticas y herramientas premium.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  height: 1.4,
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 24),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  Navigator.pop(dialogContext);
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(
+                                                    0xFFFFB74D,
+                                                  ),
+                                                  foregroundColor: Colors.black,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 32,
+                                                        vertical: 14,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  'Continuar',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                } on StateError catch (error) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: Colors.red,
+                                        content: Text(error.toString()),
+                                      ),
+                                    );
+                                } catch (_) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      const SnackBar(
+                                        backgroundColor: Colors.red,
+                                        content: Text(
+                                          'No se pudo procesar el pago. Inténtalo nuevamente.',
+                                        ),
+                                      ),
+                                    );
+                                }
+                              },
+                              child: const Text(
+                                r'Pagar $599.00 y Mejorar',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -568,19 +934,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             context.push('/my-addresses');
-          },
-        ),
-        ListTile(
-          leading: _brandIcon(Icons.credit_card),
-          title: const Text('Billetera y Pagos'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => const WalletScreen(),
-              ),
-            );
           },
         ),
       ],

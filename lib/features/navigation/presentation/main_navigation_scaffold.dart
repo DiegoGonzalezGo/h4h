@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class MainNavigationScaffold extends StatelessWidget {
-  const MainNavigationScaffold({
-    required this.navigationShell,
-    super.key,
-  });
+  const MainNavigationScaffold({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
@@ -32,6 +29,11 @@ class MainNavigationScaffold extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Actividad',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            activeIcon: Icon(Icons.account_balance_wallet),
+            label: 'Billetera',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
