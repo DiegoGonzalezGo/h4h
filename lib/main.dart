@@ -5,15 +5,20 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // 1. Importación para el gestor de estado
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'firebase_options.dart';
 import 'core/router/app_router.dart'; // 2. Importación para que reconozca "appRouter"
+import 'core/services/ad_mob_service.dart';
 import 'features/notifications/notifications_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (AdMobService.isSupportedPlatform) {
+    await MobileAds.instance.initialize();
+  }
 
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   final notificationsService = NotificationsService();

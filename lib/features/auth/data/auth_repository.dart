@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/ad_mob_service.dart';
 import '../../users/data/provider_mode.dart';
 import '../../users/data/user_model.dart';
 
@@ -39,13 +40,10 @@ class AuthRepository {
       );
 
       // Guarda el perfil en la colección 'users'
-      await _firestore
-          .collection('users')
-          .doc(newUser.uid)
-          .set({
-            ...newUser.toMap(),
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+      await _firestore.collection('users').doc(newUser.uid).set({
+        ...newUser.toMap(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       _ref.read(providerModeProvider.notifier).setMode(false);
     } catch (e) {
       throw Exception('Error al registrar: $e');
@@ -63,6 +61,7 @@ class AuthRepository {
 
   // 3. Cerrar sesión
   Future<void> signOut() async {
+    AdMobService.instance.cancelAdTimers();
     await _auth.signOut();
     _ref.read(providerModeProvider.notifier).setMode(false);
   }

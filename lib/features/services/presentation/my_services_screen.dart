@@ -3,8 +3,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/glassmorphism.dart';
 import '../data/service_model.dart';
 import '../data/services_repository.dart';
+import '../../users/data/user_repository.dart';
 
 class MyServicesScreen extends ConsumerStatefulWidget {
   const MyServicesScreen({super.key});
@@ -17,16 +19,17 @@ class _MyServicesScreenState extends ConsumerState<MyServicesScreen> {
   InputDecoration _modalFieldDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.grey[400]),
+      labelStyle: const TextStyle(color: Colors.white70),
+      prefixIcon: Icon(icon, color: Colors.white70),
       filled: true,
-      fillColor: const Color(0xFF292929),
+      fillColor: Colors.white.withValues(alpha: 0.05),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -69,9 +72,7 @@ class _MyServicesScreenState extends ConsumerState<MyServicesScreen> {
                   maxHeight: MediaQuery.sizeOf(context).height * 0.85,
                   maxWidth: 520,
                 ),
-                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
@@ -88,147 +89,182 @@ class _MyServicesScreenState extends ConsumerState<MyServicesScreen> {
                     ),
                   ],
                 ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Editar servicio',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 1.5,
                         ),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: titleController,
-                        decoration: _modalFieldDecoration(
-                          'Título',
-                          Icons.title,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: descriptionController,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: _modalFieldDecoration(
-                          'Descripción',
-                          Icons.description,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: priceController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: _modalFieldDecoration(
-                          'Precio',
-                          Icons.attach_money,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedCategory,
-                        decoration: _modalFieldDecoration(
-                          'Categoría',
-                          Icons.category,
-                        ),
-                        items: categories
-                            .map(
-                              (category) => DropdownMenuItem(
-                                value: category,
-                                child: Text(category),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Editar servicio',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(height: 20),
+                            TextField(
+                              controller: titleController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _modalFieldDecoration(
+                                'Título',
+                                Icons.title,
                               ),
-                            )
-                            .toList(),
-                        onChanged: (category) {
-                          if (category != null) {
-                            setDialogState(() => selectedCategory = category);
-                          }
-                        },
-                      ),
-                      if (formError != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          formError!,
-                          style: const TextStyle(color: Colors.redAccent),
-                        ),
-                      ],
-                      const SizedBox(height: 22),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: isSaving
-                                ? null
-                                : () => Navigator.pop(dialogContext),
-                            child: const Text('Cancelar'),
-                          ),
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: isSaving
-                                ? null
-                                : () async {
-                                    final title = titleController.text.trim();
-                                    final price = double.tryParse(
-                                      priceController.text.trim(),
-                                    );
-                                    if (title.isEmpty ||
-                                        price == null ||
-                                        price < 0) {
-                                      setDialogState(() {
-                                        formError = 'Ingresa un título y un precio válido.';
-                                      });
-                                      return;
-                                    }
-
-                                    setDialogState(() {
-                                      isSaving = true;
-                                      formError = null;
-                                    });
-                                    try {
-                                      await ref
-                                          .read(servicesRepositoryProvider)
-                                          .updateService(
-                                            serviceId: service.id,
-                                            title: title,
-                                            description:
-                                                descriptionController.text,
-                                            price: price,
-                                            category: selectedCategory,
-                                          );
-                                      if (dialogContext.mounted) {
-                                        Navigator.pop(dialogContext);
-                                      }
-                                    } catch (error) {
-                                      if (dialogContext.mounted) {
-                                        setDialogState(() {
-                                          formError =
-                                              'No se pudo guardar: $error';
-                                        });
-                                      }
-                                    } finally {
-                                      if (dialogContext.mounted) {
-                                        setDialogState(() => isSaving = false);
-                                      }
-                                    }
-                                  },
-                            child: isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                            ),
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: descriptionController,
+                              style: const TextStyle(color: Colors.white),
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: _modalFieldDecoration(
+                                'Descripción',
+                                Icons.description,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: priceController,
+                              style: const TextStyle(color: Colors.white),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: _modalFieldDecoration(
+                                'Precio',
+                                Icons.attach_money,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            DropdownButtonFormField<String>(
+                              initialValue: selectedCategory,
+                              decoration: _modalFieldDecoration(
+                                'Categoría',
+                                Icons.category,
+                              ),
+                              items: categories
+                                  .map(
+                                    (category) => DropdownMenuItem(
+                                      value: category,
+                                      child: Text(
+                                        category,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
                                     ),
                                   )
-                                : const Text('Guardar Cambios'),
-                          ),
-                        ],
+                                  .toList(),
+                              onChanged: (category) {
+                                if (category != null) {
+                                  setDialogState(
+                                    () => selectedCategory = category,
+                                  );
+                                }
+                              },
+                            ),
+                            if (formError != null) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                formError!,
+                                style: const TextStyle(color: Colors.redAccent),
+                              ),
+                            ],
+                            const SizedBox(height: 22),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton(
+                                  onPressed: isSaving
+                                      ? null
+                                      : () => Navigator.pop(dialogContext),
+                                  child: const Text('Cancelar'),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  onPressed: isSaving
+                                      ? null
+                                      : () async {
+                                          final title = titleController.text
+                                              .trim();
+                                          final price = double.tryParse(
+                                            priceController.text.trim(),
+                                          );
+                                          if (title.isEmpty ||
+                                              price == null ||
+                                              price < 0) {
+                                            setDialogState(() {
+                                              formError = 'Ingresa un título y un precio válido.';
+                                            });
+                                            return;
+                                          }
+
+                                          setDialogState(() {
+                                            isSaving = true;
+                                            formError = null;
+                                          });
+                                          try {
+                                            await ref
+                                                .read(
+                                                  servicesRepositoryProvider,
+                                                )
+                                                .updateService(
+                                                  serviceId: service.id,
+                                                  title: title,
+                                                  description:
+                                                      descriptionController
+                                                          .text,
+                                                  price: price,
+                                                  category: selectedCategory,
+                                                );
+                                            if (dialogContext.mounted) {
+                                              Navigator.pop(dialogContext);
+                                            }
+                                          } catch (error) {
+                                            if (dialogContext.mounted) {
+                                              setDialogState(() {
+                                                formError =
+                                                    'No se pudo guardar: $error';
+                                              });
+                                            }
+                                          } finally {
+                                            if (dialogContext.mounted) {
+                                              setDialogState(
+                                                () => isSaving = false,
+                                              );
+                                            }
+                                          }
+                                        },
+                                  child: isSaving
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text('Guardar Cambios'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -247,164 +283,210 @@ class _MyServicesScreenState extends ConsumerState<MyServicesScreen> {
   Widget build(BuildContext context) {
     // Escuchamos los servicios del proveedor logueado
     final myServicesAsync = ref.watch(myServicesProvider);
+    final userData = ref
+        .watch(currentUserStreamProvider)
+        .maybeWhen(data: (data) => data, orElse: () => null);
+    final plan = userData?['plan']?.toString().toLowerCase();
+    final hasProviderPlan =
+        plan == 'pro' ||
+        plan == 'elite' ||
+        userData?['isPro'] == true ||
+        userData?['isElite'] == true ||
+        userData?['isPremium'] == true;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mis Servicios Publicados')),
-      body: myServicesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, stack) => Center(child: Text('Error: $e')),
-        data: (services) {
-          if (services.isEmpty) {
-            return const Center(
-              child: Text('Aún no has publicado ningún servicio.'),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: services.length,
-            itemBuilder: (context, index) {
-              final service = services[index];
-
-              return Dismissible(
-                key: ValueKey(service.id),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade900,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(Icons.delete, color: Colors.white),
-                ),
-                onDismissed: (direction) {
-                  ref
-                      .read(servicesRepositoryProvider)
-                      .deleteService(service.id);
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              service.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                decoration: service.isActive
-                                    ? null
-                                    : TextDecoration.lineThrough,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          PopupMenuButton<String>(
-                            icon: const Icon(
-                              Icons.more_vert,
-                              color: Colors.white60,
-                            ),
-                            onSelected: (action) {
-                              if (action == 'editar') {
-                                _showEditServiceModal(context, service);
-                              } else if (action == 'delete') {
-                                ref
-                                    .read(servicesRepositoryProvider)
-                                    .deleteService(service.id);
-                              }
-                            },
-                            itemBuilder: (context) => const [
-                              PopupMenuItem<String>(
-                                value: 'editar',
-                                child: Text(
-                                  'Editar',
-                                  style: TextStyle(color: Colors.redAccent),
-                                ),
-                              ),
-                              PopupMenuItem<String>(
-                                value: 'delete',
-                                child: Text(
-                                  'Eliminar',
-                                  style: TextStyle(color: Colors.redAccent),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(
-                            '\$${service.price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Color(0xFF00B4DB),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Text(
-                            '• 0 vistas',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Estado del servicio:',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ),
-                          Switch(
-                            value: service.isActive,
-                            activeThumbColor: const Color(0xFF2575FC),
-                            inactiveThumbColor: const Color(0xFF424242),
-                            inactiveTrackColor: const Color(0xFF616161),
-                            onChanged: (newValue) {
-                              ref
-                                  .read(servicesRepositoryProvider)
-                                  .toggleServiceStatus(
-                                    service.id,
-                                    service.isActive,
-                                  );
-                            },
-                          ),
-                          Text(
-                            service.isActive ? 'Activo' : 'Inactivo',
-                            style: TextStyle(
-                              color: service.isActive
-                                  ? Colors.greenAccent
-                                  : Colors.grey,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Mis Servicios Publicados'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: GlowBackground(
+        child: myServicesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, stack) => Center(child: Text('Error: $e')),
+          data: (services) {
+            if (services.isEmpty) {
+              return const Center(
+                child: Text('Aún no has publicado ningún servicio.'),
               );
-            },
-          );
-        },
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: services.length,
+              itemBuilder: (context, index) {
+                final service = services[index];
+
+                return Dismissible(
+                  key: ValueKey(service.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade900,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (direction) {
+                    ref
+                        .read(servicesRepositoryProvider)
+                        .deleteService(service.id);
+                  },
+                  child: GlassCard(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                service.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: service.isActive
+                                      ? null
+                                      : TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            PopupMenuButton<String>(
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white60,
+                              ),
+                              onSelected: (action) {
+                                if (action == 'editar') {
+                                  _showEditServiceModal(context, service);
+                                } else if (action == 'delete') {
+                                  ref
+                                      .read(servicesRepositoryProvider)
+                                      .deleteService(service.id);
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem<String>(
+                                  value: 'editar',
+                                  child: Text(
+                                    'Editar',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Text(
+                                    'Eliminar',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              '\$${service.price.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Color(0xFF00B4DB),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              '• 0 vistas',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Estado del servicio:',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            ),
+                            Switch(
+                              value: service.isActive,
+                              activeThumbColor: const Color(0xFF2575FC),
+                              inactiveThumbColor: const Color(0xFF424242),
+                              inactiveTrackColor: const Color(0xFF616161),
+                              onChanged:
+                                  service.inactiveReason ==
+                                          'subscription_expired' &&
+                                      !hasProviderPlan
+                                  ? null
+                                  : (newValue) async {
+                                      try {
+                                        await ref
+                                            .read(servicesRepositoryProvider)
+                                            .toggleServiceStatus(
+                                              service.id,
+                                              service.isActive,
+                                            );
+                                      } catch (error) {
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(context)
+                                          ..hideCurrentSnackBar()
+                                          ..showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                error is StateError
+                                                    ? error.message
+                                                    : 'No se pudo actualizar el servicio: $error',
+                                              ),
+                                            ),
+                                          );
+                                      }
+                                    },
+                            ),
+                            Text(
+                              service.inactiveReason == 'subscription_expired'
+                                  ? 'Pausado (Requiere Plan Pro)'
+                                  : service.isActive
+                                  ? 'Activo'
+                                  : 'Inactivo',
+                              style: TextStyle(
+                                color:
+                                    service.inactiveReason ==
+                                        'subscription_expired'
+                                    ? Colors.orangeAccent
+                                    : service.isActive
+                                    ? Colors.greenAccent
+                                    : Colors.grey,
+                                fontWeight: FontWeight.w600,
+                                fontSize:
+                                    service.inactiveReason ==
+                                        'subscription_expired'
+                                    ? 11
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

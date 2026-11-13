@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/glassmorphism.dart';
 import '../data/user_repository.dart';
 
 class EarningsStatisticsScreen extends ConsumerWidget {
   const EarningsStatisticsScreen({super.key});
 
   static const _backgroundColor = Color(0xFF000000);
-  static const _cardColor = Color(0xFF1E1E1E);
   static const _earningsColor = Color(0xFF6A11CB);
   static const _expensesColor = Color(0xFFFF7043);
 
@@ -30,120 +30,118 @@ class EarningsStatisticsScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: transactionsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'No se pudieron cargar las estadísticas: $error',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70),
+      body: GlowBackground(
+        child: transactionsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No se pudieron cargar las estadísticas: $error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
             ),
           ),
-        ),
-        data: (transactions) {
-          final totalGanado = transactions
-              .where((transaction) => transaction.isPositive)
-              .fold<double>(
-                0,
-                (total, transaction) => total + transaction.amount,
-              );
-          final totalGastado = transactions
-              .where((transaction) => !transaction.isPositive)
-              .fold<double>(
-                0,
-                (total, transaction) => total + transaction.amount,
-              );
+          data: (transactions) {
+            final totalGanado = transactions
+                .where((transaction) => transaction.isPositive)
+                .fold<double>(
+                  0,
+                  (total, transaction) => total + transaction.amount,
+                );
+            final totalGastado = transactions
+                .where((transaction) => !transaction.isPositive)
+                .fold<double>(
+                  0,
+                  (total, transaction) => total + transaction.amount,
+                );
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _SummaryCard(
-                      title: 'Total Ganancias',
-                      formattedAmount: currencyFormat.format(totalGanado),
-                      colors: const [_earningsColor, Color(0xFF2575FC)],
-                      icon: Icons.trending_up,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _SummaryCard(
-                      title: 'Total Gastos',
-                      formattedAmount: currencyFormat.format(totalGastado),
-                      colors: const [Color(0xFFEF5350), _expensesColor],
-                      icon: Icons.trending_down,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Row(
                   children: [
-                    const Text(
-                      'Ganancias vs. gastos',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: _SummaryCard(
+                        title: 'Total Ganancias',
+                        formattedAmount: currencyFormat.format(totalGanado),
+                        colors: const [_earningsColor, Color(0xFF2575FC)],
+                        icon: Icons.trending_up,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Comparativo de tus movimientos',
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
-                    ),
-                    const SizedBox(height: 24),
-                    if (transactions.isEmpty)
-                      const SizedBox(
-                        height: 220,
-                        child: Center(
-                          child: Text(
-                            'Aún no hay movimientos para mostrar',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white54),
-                          ),
-                        ),
-                      )
-                    else
-                      SizedBox(
-                        height: 220,
-                        child: _EarningsBarChart(
-                          totalGanado: totalGanado,
-                          totalGastado: totalGastado,
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SummaryCard(
+                        title: 'Total Gastos',
+                        formattedAmount: currencyFormat.format(totalGastado),
+                        colors: const [Color(0xFFEF5350), _expensesColor],
+                        icon: Icons.trending_down,
                       ),
-                    const SizedBox(height: 16),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _ChartLegendItem(
-                          color: _earningsColor,
-                          label: 'Ganancias',
-                        ),
-                        SizedBox(width: 24),
-                        _ChartLegendItem(
-                          color: _expensesColor,
-                          label: 'Gastos',
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
+                const SizedBox(height: 28),
+                GlassCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Ganancias vs. gastos',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Comparativo de tus movimientos',
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
+                      ),
+                      const SizedBox(height: 24),
+                      if (transactions.isEmpty)
+                        const SizedBox(
+                          height: 220,
+                          child: Center(
+                            child: Text(
+                              'Aún no hay movimientos para mostrar',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 220,
+                          child: _EarningsBarChart(
+                            totalGanado: totalGanado,
+                            totalGastado: totalGastado,
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _ChartLegendItem(
+                            color: _earningsColor,
+                            label: 'Ganancias',
+                          ),
+                          SizedBox(width: 24),
+                          _ChartLegendItem(
+                            color: _expensesColor,
+                            label: 'Gastos',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -164,15 +162,16 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
+    return GlassCard(
+      padding: EdgeInsets.zero,
       child: Container(
         constraints: const BoxConstraints(minHeight: 152),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: colors,
+            colors: colors
+                .map((color) => color.withValues(alpha: 0.24))
+                .toList(),
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

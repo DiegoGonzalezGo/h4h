@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/cached_app_image.dart';
+import '../../../core/widgets/loading_skeletons.dart';
 import 'full_screen_image_viewer.dart';
 
 class ProviderPortfolioSection extends StatelessWidget {
@@ -19,13 +21,7 @@ class ProviderPortfolioSection extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
+          return const PortfolioStripSkeleton();
         }
 
         if (snapshot.hasError) {
@@ -56,14 +52,18 @@ class ProviderPortfolioSection extends StatelessWidget {
                       data['downloadURL'] as String? ??
                       data['imageUrl'] as String? ??
                       '';
+                  final title = _titleFrom(data);
 
                   return Container(
                     width: 150,
                     margin: const EdgeInsets.only(right: 10),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: imageUrl.isEmpty
-                          ? Container(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (imageUrl.isEmpty)
+                            Container(
                               color: Colors.black12,
                               alignment: Alignment.center,
                               child: const Icon(
@@ -71,31 +71,57 @@ class ProviderPortfolioSection extends StatelessWidget {
                                 size: 36,
                               ),
                             )
-                          : GestureDetector(
+                          else
+                            GestureDetector(
                               onTap: () {
                                 Navigator.push<void>(
                                   context,
                                   MaterialPageRoute<void>(
                                     builder: (context) => FullScreenImageViewer(
                                       imageUrl: imageUrl,
+                                      title: title,
                                     ),
                                   ),
                                 );
                               },
-                              child: Image.network(
-                                imageUrl,
+                              child: CachedAppImage(
+                                imageUrl: imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      color: Colors.black12,
-                                      alignment: Alignment.center,
-                                      child: const Icon(
-                                        Icons.broken_image_outlined,
-                                        size: 36,
-                                      ),
-                                    ),
+                                width: 150,
+                                height: 150,
+                                errorIconSize: 36,
                               ),
                             ),
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Color(0xD9000000),
+                                  ],
+                                ),
+                              ),
+                              child: Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -105,5 +131,14 @@ class ProviderPortfolioSection extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _titleFrom(Map<String, dynamic> data) {
+    final title = data['title']?.toString().trim() ?? '';
+    if (title.isNotEmpty) return title;
+    final legacyDescription = data['description']?.toString().trim() ?? '';
+    return legacyDescription.isNotEmpty
+        ? legacyDescription
+        : 'Evidencia de trabajo';
   }
 }

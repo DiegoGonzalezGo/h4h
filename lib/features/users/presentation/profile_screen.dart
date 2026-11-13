@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -6,12 +8,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/services/ad_mob_service.dart';
+import '../../../core/widgets/glassmorphism.dart';
+import '../../../core/widgets/cached_app_image.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/user_repository.dart';
 import '../data/provider_mode.dart';
+import '../data/subscription_repository.dart';
 import 'earnings_statistics_screen.dart';
 import 'portfolio_screen.dart';
+import 'subscription_plans_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -26,12 +34,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _toggleMode(bool newValue) async {
     if (_isTogglingMode || newValue == ref.read(providerModeProvider)) return;
 
-    if (!newValue) {
-      ref.read(providerModeProvider.notifier).toggleMode(false);
-      return;
-    }
-
     setState(() => _isTogglingMode = true);
+    var waitingForAd = false;
     try {
       final user = ref.read(currentUserControllerProvider).value;
       if (user == null) {
@@ -43,12 +47,131 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return;
       }
 
-      if (!user.isProviderSetupComplete) {
-        final setupSuccess = await _showProviderSetupModal(context);
+      final subscriptionExpired = await SubscriptionRepository()
+          .checkSubscriptionStatus(userId: user.uid);
+      if (!mounted) return;
+      if (subscriptionExpired) {
+        ref.read(providerModeProvider.notifier).setMode(false);
+      }
+
+      final userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (!mounted) return;
+      if (!userSnapshot.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se encontró tu perfil.')),
+        );
+        return;
+      }
+
+      final userData = userSnapshot.data()!;
+      final plan = userData['plan']?.toString().toLowerCase();
+      final hasProviderPlan =
+          plan == 'pro' ||
+          plan == 'elite' ||
+          userData['isPro'] == true ||
+          userData['isElite'] == true ||
+          userData['isPremium'] == true;
+      if (newValue && !hasProviderPlan) {
+        final shouldViewPlans = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Plan requerido'),
+            content: const Text(
+              'El Modo Proveedor requiere el Plan Pro o Élite',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Ahora no'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Ver Planes'),
+              ),
+            ],
+          ),
+        );
+        if (shouldViewPlans == true && mounted) {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) => const SubscriptionPlansScreen(),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (newValue && !_hasProfessionalProfile(userData)) {
+        final setupSuccess = await _showProviderSetupModal(context, userData);
         if (setupSuccess != true || !mounted) return;
       }
 
+      void applyModeChange() {
+        unawaited(_completeModeChange(user.uid, newValue));
+      }
+
+      if (AdMobService.shouldShowAds(userData)) {
+        waitingForAd = true;
+        AdMobService.instance.showInterstitialAd(applyModeChange);
+      } else {
+        applyModeChange();
+      }
+    } catch (error, stackTrace) {
+      debugPrint('No se pudo validar el plan antes de cambiar de modo: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo validar tu plan. Inténtalo nuevamente.'),
+          ),
+        );
+      }
+    } finally {
+      if (!waitingForAd && mounted) {
+        setState(() => _isTogglingMode = false);
+      }
+    }
+  }
+
+  bool _hasProfessionalProfile(Map<String, dynamic> userData) {
+    if (userData['hasCompletedProviderProfile'] == true ||
+        userData['isProviderSetupComplete'] == true) {
+      return true;
+    }
+
+    final bio = userData['bio']?.toString().trim() ?? '';
+    final rawSpecialties = userData['specialties'] ?? userData['skills'];
+    final specialties = rawSpecialties is Iterable
+        ? rawSpecialties
+              .map((specialty) => specialty.toString().trim())
+              .where((specialty) => specialty.isNotEmpty)
+        : (rawSpecialties is String && rawSpecialties.trim().isNotEmpty)
+        ? [rawSpecialties.trim()]
+        : const <String>[];
+    return bio.isNotEmpty && specialties.isNotEmpty;
+  }
+
+  Future<void> _completeModeChange(String userId, bool newValue) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'isProviderMode': newValue,
+      });
+      if (!mounted) return;
       ref.read(providerModeProvider.notifier).toggleMode(newValue);
+    } catch (error, stackTrace) {
+      debugPrint('No se pudo guardar el modo del usuario: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo actualizar el modo de tu cuenta.'),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isTogglingMode = false);
     }
@@ -63,15 +186,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
     if (userId == null) {
-      return const Scaffold(body: Center(child: Text('Usuario no encontrado')));
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'Usuario no encontrado',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
     }
 
     // Escuchamos los datos del perfil (Nombre y foto) en tiempo real
     final userProfileAsync = ref.watch(userProfileStreamProvider(userId));
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Mi Perfil'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -90,96 +225,87 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 24),
+      body: GlowBackground(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 24),
 
-            // --- SECCIÓN DE ENCABEZADO (FOTO, NOMBRE Y BOTÓN DE EDITAR) ---
-            userProfileAsync.when(
-              loading: () => const CircularProgressIndicator(),
-              error: (e, stack) => const Icon(Icons.error),
-              data: (userData) {
-                final String name = userData['name'] ?? 'Usuario Hand4Hand';
-                final String? photoUrl = userData['photoUrl'];
+              // --- SECCIÓN DE ENCABEZADO (FOTO, NOMBRE Y BOTÓN DE EDITAR) ---
+              GlassCard(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(20),
+                child: userProfileAsync.when(
+                  loading: () => const CircularProgressIndicator(),
+                  error: (e, stack) => const Icon(Icons.error),
+                  data: (userData) {
+                    final String name = userData['name'] ?? 'Usuario Hand4Hand';
+                    final String? photoUrl = userData['photoUrl'];
 
-                return Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-                        ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.blue.shade100,
-                        backgroundImage: photoUrl != null
-                            ? NetworkImage(photoUrl)
-                            : null,
-                        child: photoUrl == null
-                            ? const Icon(
-                                Icons.person,
-                                size: 50,
-                                color: Colors.white,
-                              )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (userData['bio'] != null &&
-                        userData['bio'].toString().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          top: 8.0,
-                          left: 24,
-                          right: 24,
-                        ),
-                        child: Text(
-                          userData['bio'],
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontStyle: FontStyle.italic,
+                    return Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                            ),
+                          ),
+                          child: CachedAppAvatar(
+                            imageUrl: photoUrl,
+                            radius: 50,
+                            backgroundColor: Colors.blue.shade100,
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Color(0xFF2575FC)),
-                      ),
-                      icon: const Icon(Icons.edit, size: 18),
-                      label: const Text('Editar perfil'),
-                      onPressed: () {
-                        context.push('/edit-profile');
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-            // --- FIN DEL ENCABEZADO ---
-
-            const SizedBox(height: 24),
-
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(16),
+                        const SizedBox(height: 12),
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (userData['bio'] != null &&
+                            userData['bio'].toString().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 8.0,
+                              left: 24,
+                              right: 24,
+                            ),
+                            child: Text(
+                              userData['bio'],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Color(0xFF2575FC)),
+                          ),
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: const Text('Editar perfil'),
+                          onPressed: () {
+                            context.push('/edit-profile');
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-              child: Padding(
+              // --- FIN DEL ENCABEZADO ---
+
+              const SizedBox(height: 24),
+
+              GlassCard(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
@@ -216,170 +342,322 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Renderizamos los menús dependiendo del modo
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(16),
+              // Renderizamos los menús dependiendo del modo
+              GlassCard(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.zero,
+                child: isProviderMode
+                    ? _buildProviderView(context)
+                    : _buildClientView(context),
               ),
-              child: isProviderMode
-                  ? _buildProviderView(context)
-                  : _buildClientView(context),
-            ),
-          ],
+              const SizedBox(height: 12),
+              GlassCard(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: _brandIcon(Icons.workspace_premium),
+                      title: const Text('Planes SkillMatch'),
+                      subtitle: const Text(
+                        'Gratis, Pro y Élite',
+                        style: TextStyle(color: Colors.white60),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push<void>(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (context) =>
+                                const SubscriptionPlansScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    userProfileAsync.maybeWhen(
+                      data: (userData) {
+                        final isElite =
+                            userData['isElite'] == true ||
+                            userData['isPremium'] == true ||
+                            userData['plan'] == 'elite';
+                        if (!isElite) return const SizedBox.shrink();
+                        return ListTile(
+                          leading: _brandIcon(Icons.support_agent),
+                          title: const Text(
+                            'Soporte Técnico VIP / Prioritario',
+                          ),
+                          subtitle: const Text(
+                            'Atención directa para usuarios Élite',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                          trailing: const Icon(Icons.open_in_new),
+                          onTap: _openVipSupport,
+                        );
+                      },
+                      orElse: () => const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Future<bool> _showProviderSetupModal(BuildContext context) async {
-    final bioController = TextEditingController();
-    final skillsController = TextEditingController();
+  Future<void> _openVipSupport() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Inicia sesión para contactar soporte.')),
+      );
+      return;
+    }
+
+    final message = Uri.encodeComponent(
+      'Hola, soy usuario Élite de SkillMatch y necesito soporte técnico '
+      'prioritario con mi cuenta UID $userId.',
+    );
+    final uri = Uri.parse('https://wa.me/529192705197?text=$message');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir WhatsApp. Inténtalo nuevamente.'),
+        ),
+      );
+    }
+  }
+
+  Future<bool> _showProviderSetupModal(
+    BuildContext context,
+    Map<String, dynamic> userData,
+  ) async {
+    final rawSpecialties = userData['specialties'] ?? userData['skills'];
+    final specialties = rawSpecialties is Iterable
+        ? rawSpecialties.map((specialty) => specialty.toString()).toList()
+        : rawSpecialties is String
+        ? rawSpecialties.split(',')
+        : <String>[];
+    final bioController = TextEditingController(
+      text: userData['bio']?.toString() ?? '',
+    );
+    final skillsController = TextEditingController(
+      text: specialties.join(', '),
+    );
     final formKey = GlobalKey<FormState>();
     File? selectedImage;
+    final existingPhotoUrl =
+        [userData['photoUrl'], userData['profilePictureUrl']]
+            .map((url) => url?.toString().trim() ?? '')
+            .firstWhere((url) => url.isNotEmpty, orElse: () => '');
 
     try {
-      final setup = await showDialog<(String, List<String>, File)>(
+      final setup = await showDialog<(String, List<String>, File?)>(
         context: context,
         builder: (dialogContext) => StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-            title: const Text('Configura tu perfil profesional'),
-            content: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Cuéntales a tus clientes qué servicios ofreces y cuál '
-                      'es tu experiencia.',
+          builder: (dialogContext, setDialogState) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: 480,
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+                  ),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      width: 1,
                     ),
-                    const SizedBox(height: 16),
-                    FormField<File>(
-                      validator: (_) => selectedImage == null
-                          ? 'Selecciona una foto de perfil para continuar.'
-                          : null,
-                      builder: (field) => Column(
-                        children: [
-                          CircleAvatar(
-                            radius: 44,
-                            backgroundColor: const Color(0xFF303030),
-                            backgroundImage: selectedImage == null
-                                ? null
-                                : FileImage(selectedImage!),
-                            child: selectedImage == null
-                                ? const Icon(
-                                    Icons.add_a_photo,
-                                    color: Colors.white70,
-                                    size: 30,
-                                  )
-                                : null,
+                  ),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Configura tu perfil profesional',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
                           ),
-                          TextButton.icon(
-                            onPressed: () async {
-                              final image = await ImagePicker().pickImage(
-                                source: ImageSource.gallery,
-                                imageQuality: 70,
-                              );
-                              if (image == null || !dialogContext.mounted) {
-                                return;
-                              }
-
-                              selectedImage = File(image.path);
-                              field.didChange(selectedImage);
-                              setDialogState(() {});
-                            },
-                            icon: const Icon(Icons.photo_library_outlined),
-                            label: Text(
-                              selectedImage == null
-                                  ? 'Seleccionar foto de perfil *'
-                                  : 'Cambiar foto de perfil',
-                            ),
-                          ),
-                          if (field.errorText != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                field.errorText!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                  fontSize: 12,
+                        ),
+                        const SizedBox(height: 12),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Cuéntales a tus clientes qué servicios '
+                                  'ofreces y cuál es tu experiencia.',
+                                  style: TextStyle(color: Colors.white70),
+                                  textAlign: TextAlign.center,
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                FormField<File>(
+                                  validator: (_) =>
+                                      selectedImage == null &&
+                                          existingPhotoUrl.isEmpty
+                                      ? 'Selecciona una foto de perfil para continuar.'
+                                      : null,
+                                  builder: (field) => Column(
+                                    children: [
+                                      if (selectedImage != null)
+                                        CircleAvatar(
+                                          radius: 44,
+                                          backgroundColor: const Color(
+                                            0xFF303030,
+                                          ),
+                                          backgroundImage: FileImage(
+                                            selectedImage!,
+                                          ),
+                                        )
+                                      else
+                                        CachedAppAvatar(
+                                          imageUrl: existingPhotoUrl,
+                                          radius: 44,
+                                          backgroundColor: const Color(
+                                            0xFF303030,
+                                          ),
+                                        ),
+                                      TextButton.icon(
+                                        onPressed: () async {
+                                          final image = await ImagePicker()
+                                              .pickImage(
+                                                source: ImageSource.gallery,
+                                                imageQuality: 70,
+                                              );
+                                          if (image == null ||
+                                              !dialogContext.mounted) {
+                                            return;
+                                          }
+
+                                          selectedImage = File(image.path);
+                                          field.didChange(selectedImage);
+                                          setDialogState(() {});
+                                        },
+                                        icon: const Icon(
+                                          Icons.photo_library_outlined,
+                                        ),
+                                        label: Text(
+                                          selectedImage == null &&
+                                                  existingPhotoUrl.isEmpty
+                                              ? 'Seleccionar foto de perfil *'
+                                              : 'Cambiar foto de perfil',
+                                        ),
+                                      ),
+                                      if (field.errorText != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 4,
+                                          ),
+                                          child: Text(
+                                            field.errorText!,
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: bioController,
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: _providerProfileInputDecoration(
+                                    label: 'Biografía profesional',
+                                    hint: 'Describe tu experiencia y servicios',
+                                  ),
+                                  minLines: 3,
+                                  maxLines: 5,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Escribe una breve biografía profesional.';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: skillsController,
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: _providerProfileInputDecoration(
+                                    label: 'Especialidades',
+                                    hint: 'Ej. Plomería, pintura, electricidad',
+                                    helper: 'Separa cada especialidad con una coma.',
+                                  ),
+                                  validator: (value) {
+                                    final skills =
+                                        value
+                                            ?.split(',')
+                                            .map((skill) => skill.trim()) ??
+                                        [];
+                                    if (skills
+                                        .where((skill) => skill.isNotEmpty)
+                                        .isEmpty) {
+                                      return 'Agrega al menos una especialidad.';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('Ahora no'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: () {
+                                if (!formKey.currentState!.validate()) return;
+                                final skills = skillsController.text
+                                    .split(',')
+                                    .map((skill) => skill.trim())
+                                    .where((skill) => skill.isNotEmpty)
+                                    .toSet()
+                                    .toList();
+                                Navigator.pop(dialogContext, (
+                                  bioController.text.trim(),
+                                  skills,
+                                  selectedImage,
+                                ));
+                              },
+                              child: const Text('Guardar y activar'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: bioController,
-                      decoration: const InputDecoration(
-                        labelText: 'Biografía profesional',
-                        hintText: 'Describe tu experiencia y servicios',
-                        border: OutlineInputBorder(),
-                      ),
-                      minLines: 3,
-                      maxLines: 5,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Escribe una breve biografía profesional.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: skillsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Especialidades',
-                        hintText: 'Ej. Plomería, pintura, electricidad',
-                        helperText: 'Separa cada especialidad con una coma.',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        final skills =
-                            value?.split(',').map((skill) => skill.trim()) ??
-                            [];
-                        if (skills.where((skill) => skill.isNotEmpty).isEmpty) {
-                          return 'Agrega al menos una especialidad.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Ahora no'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) return;
-                  final image = selectedImage;
-                  if (image == null) return;
-                  final skills = skillsController.text
-                      .split(',')
-                      .map((skill) => skill.trim())
-                      .where((skill) => skill.isNotEmpty)
-                      .toSet()
-                      .toList();
-                  Navigator.pop(dialogContext, (
-                    bioController.text.trim(),
-                    skills,
-                    image,
-                  ));
-                },
-                child: const Text('Guardar y activar'),
-              ),
-            ],
           ),
         ),
       );
@@ -408,6 +686,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       bioController.dispose();
       skillsController.dispose();
     }
+  }
+
+  InputDecoration _providerProfileInputDecoration({
+    required String label,
+    required String hint,
+    String? helper,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      helperText: helper,
+      labelStyle: const TextStyle(color: Colors.white70),
+      hintStyle: const TextStyle(color: Colors.white38),
+      helperStyle: const TextStyle(color: Colors.white54),
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.05),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.cyanAccent),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+    );
   }
 
   Widget _buildAnimatedModeToggle({
@@ -565,7 +876,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 .get();
 
             if (!context.mounted) return;
-            final isPremium = userDoc.data()?['isPremium'] == true;
+            final profileData = userDoc.data();
+            final isPremium =
+                profileData?['isElite'] == true ||
+                profileData?['isPremium'] == true ||
+                profileData?['plan'] == 'elite';
 
             if (isPremium) {
               Navigator.push(
@@ -690,14 +1005,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                                 try {
                                   final userDoc = await userRef.get();
-                                  // ignore: avoid_print
-                                  print('Datos del usuario: ${userDoc.data()}');
                                   final data = userDoc.data();
-                                  final double saldoActual =
-                                      double.tryParse(
-                                        data?['balance']?.toString() ?? '0',
-                                      ) ??
-                                      0.0;
+                                  final saldoActual = data?['balance'] is num
+                                      ? (data!['balance'] as num).toDouble()
+                                      : 10000.0;
 
                                   if (saldoActual < premiumPrice) {
                                     if (!context.mounted) return;
@@ -714,6 +1025,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     return;
                                   }
 
+                                  final earningRef = FirebaseFirestore.instance
+                                      .collection('platform_earnings')
+                                      .doc();
                                   await FirebaseFirestore.instance
                                       .runTransaction<void>((
                                         transaction,
@@ -721,14 +1035,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         final snapshot = await transaction.get(
                                           userRef,
                                         );
+                                        if (!snapshot.exists) {
+                                          throw StateError(
+                                            'No se encontró el perfil del usuario.',
+                                          );
+                                        }
                                         final transactionData = snapshot.data();
+                                        if (transactionData?['isElite'] ==
+                                                true ||
+                                            transactionData?['isPremium'] ==
+                                                true ||
+                                            transactionData?['plan'] ==
+                                                'elite') {
+                                          throw StateError(
+                                            'Tu cuenta ya tiene el plan Élite.',
+                                          );
+                                        }
                                         final currentBalance =
-                                            double.tryParse(
-                                              transactionData?['balance']
-                                                      ?.toString() ??
-                                                  '0',
-                                            ) ??
-                                            0.0;
+                                            transactionData?['balance'] is num
+                                            ? (transactionData!['balance']
+                                                      as num)
+                                                  .toDouble()
+                                            : 10000.0;
 
                                         if (currentBalance < premiumPrice) {
                                           throw StateError(
@@ -738,12 +1066,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                                         transaction.update(userRef, {
                                           'balance':
-                                              transactionData?['balance'] is num
-                                              ? FieldValue.increment(
-                                                  -premiumPrice,
-                                                )
-                                              : currentBalance - premiumPrice,
+                                              currentBalance - premiumPrice,
+                                          'plan': 'elite',
+                                          'isPro': true,
+                                          'isElite': true,
                                           'isPremium': true,
+                                          'adsDisabled': true,
+                                          'eliteActivatedAt':
+                                              FieldValue.serverTimestamp(),
                                           'premiumActivatedAt':
                                               FieldValue.serverTimestamp(),
                                         });
@@ -752,10 +1082,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                             .collection('transactions')
                                             .doc();
                                         transaction.set(paymentRef, {
-                                          'title': 'Suscripción Premium',
+                                          'title':
+                                              'Suscripción SkillMatch Élite',
                                           'amount': premiumPrice,
                                           'isPositive': false,
-                                          'requestId': 'premium_subscription',
+                                          'requestId': 'subscription_elite',
+                                          'plan': 'elite',
+                                          'createdAt':
+                                              FieldValue.serverTimestamp(),
+                                        });
+                                        transaction.set(earningRef, {
+                                          'userId': user.uid,
+                                          'type': 'subscription',
+                                          'plan': 'elite',
+                                          'amount': premiumPrice,
                                           'createdAt':
                                               FieldValue.serverTimestamp(),
                                         });

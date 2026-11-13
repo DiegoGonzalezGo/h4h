@@ -1,9 +1,14 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../chat/presentation/chat_screen.dart';
 import '../../matches/data/matches_repository.dart';
 import '../../users/data/user_repository.dart';
+import '../../../core/widgets/cached_app_image.dart';
+import '../../../core/widgets/membership_badge.dart';
 import '../data/service_model.dart';
 import '../data/services_repository.dart';
 
@@ -33,202 +38,228 @@ class ServiceCard extends ConsumerWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: 80,
-              child: InkWell(
-                onTap: () => context.push('/user/${service.providerId}'),
-                borderRadius: BorderRadius.circular(12),
-                child: providerProfileAsync.when(
-                  data: (data) {
-                    final providerName =
-                        data['name']?.toString() ?? 'Proveedor';
-                    final photoUrl = data['photoUrl']?.toString();
-                    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
-
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: const Color(0xFF303030),
-                          backgroundImage: hasPhoto
-                              ? NetworkImage(photoUrl)
-                              : null,
-                          child: hasPhoto
-                              ? null
-                              : const Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          providerName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 80),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF121212),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            service.category,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                  loading: () =>
-                      const _ProviderPlaceholder(label: 'Cargando...'),
-                  error: (error, stack) =>
-                      const _ProviderPlaceholder(label: 'Proveedor'),
-                ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 1.5,
               ),
             ),
-            VerticalDivider(width: 20, thickness: 1, color: Colors.grey[800]),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: onTap,
-                          child: Text(
-                            service.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
+                  SizedBox(
+                    width: 80,
+                    child: InkWell(
+                      onTap: () => context.push('/user/${service.providerId}'),
+                      borderRadius: BorderRadius.circular(12),
+                      child: providerProfileAsync.when(
+                        data: (data) {
+                          final providerName =
+                              data['name']?.toString() ?? 'Proveedor';
+                          final photoUrl = data['photoUrl']?.toString();
+                          final hasPhoto =
+                              photoUrl != null && photoUrl.isNotEmpty;
+                          final isElite =
+                              data['isElite'] == true ||
+                              data['isPremium'] == true ||
+                              data['plan'] == 'elite';
+                          final hasPro =
+                              isElite ||
+                              data['isPro'] == true ||
+                              data['plan'] == 'pro';
+
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CachedAppAvatar(
+                                imageUrl: hasPhoto ? photoUrl : null,
+                                radius: 30,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                providerName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: isSaved
-                            ? 'Quitar de guardados'
-                            : 'Guardar servicio',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 40,
-                          height: 40,
-                        ),
-                        icon: Icon(
-                          isSaved ? Icons.favorite : Icons.favorite_border,
-                          color: isSaved ? Colors.cyanAccent : Colors.white60,
-                        ),
-                        onPressed: () async {
-                          try {
-                            await ref
-                                .read(currentUserControllerProvider.notifier)
-                                .toggleSavedService(service.id);
-                          } catch (error) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'No se pudo actualizar guardados: $error',
+                              ),
+                              if (hasPro) ...[
+                                const SizedBox(height: 4),
+                                MembershipBadge(isElite: isElite),
+                              ],
+                              const SizedBox(height: 5),
+                              Container(
+                                constraints: const BoxConstraints(maxWidth: 80),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF121212),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  service.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
                                   ),
                                 ),
-                              );
-                            }
-                          }
+                              ),
+                            ],
+                          );
                         },
+                        loading: () =>
+                            const _ProviderPlaceholder(label: 'Cargando...'),
+                        error: (error, stack) =>
+                            const _ProviderPlaceholder(label: 'Proveedor'),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: onTap,
-                    child: Text(
-                      service.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(color: Colors.white70),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '\$${service.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: Colors.cyanAccent,
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (requestStatusAsync.isLoading && request == null)
-                        const _RequestStatusBadge(label: 'Comprobando...')
-                      else if (request?.status == 'pending')
-                        _PendingRequestButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (context) =>
-                                    ChatScreen(matchId: request!.id),
+                  VerticalDivider(
+                    width: 20,
+                    thickness: 1,
+                    color: Colors.grey[800],
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: onTap,
+                                child: Text(
+                                  service.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
                               ),
-                            );
-                          },
-                        )
-                      else if (request?.status == 'accepted')
-                        _GradientRequestButton(
-                          label: 'Abrir Chat',
-                          onPressed: () => context.push('/chat/${request!.id}'),
-                        )
-                      else if (request?.status == 'rejected')
-                        const _RequestStatusBadge(label: 'Rechazada')
-                      else if (request?.status == 'completed')
-                        const _RequestStatusBadge(label: 'Completada')
-                      else
-                        _GradientRequestButton(
-                          label: 'Solicitar',
-                          onPressed: onRequest ?? onTap,
+                            ),
+                            IconButton(
+                              tooltip: isSaved
+                                  ? 'Quitar de guardados'
+                                  : 'Guardar servicio',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 40,
+                                height: 40,
+                              ),
+                              icon: Icon(
+                                isSaved
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: isSaved
+                                    ? Colors.cyanAccent
+                                    : Colors.white60,
+                              ),
+                              onPressed: () async {
+                                try {
+                                  await ref
+                                      .read(
+                                        currentUserControllerProvider.notifier,
+                                      )
+                                      .toggleSavedService(service.id);
+                                } catch (error) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'No se pudo actualizar guardados: $error',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
                         ),
-                    ],
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: onTap,
+                          child: Text(
+                            service.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.white70),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '\$${service.price.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Colors.cyanAccent,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (requestStatusAsync.isLoading && request == null)
+                              const _RequestStatusBadge(label: 'Comprobando...')
+                            else if (request?.status == 'pending')
+                              _PendingRequestButton(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (context) =>
+                                          ChatScreen(matchId: request!.id),
+                                    ),
+                                  );
+                                },
+                              )
+                            else if (request?.status == 'accepted')
+                              _GradientRequestButton(
+                                label: 'Abrir Chat',
+                                onPressed: () =>
+                                    context.push('/chat/${request!.id}'),
+                              )
+                            else if (request?.status == 'rejected')
+                              const _RequestStatusBadge(label: 'Rechazada')
+                            else if (request?.status == 'completed')
+                              const _RequestStatusBadge(label: 'Completada')
+                            else
+                              _GradientRequestButton(
+                                label: 'Solicitar',
+                                onPressed: onRequest ?? onTap,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

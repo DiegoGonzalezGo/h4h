@@ -47,6 +47,10 @@ dependencies:
   fl_chart: ^1.2.0
   google_maps_flutter: ^2.19.0
   geocoding: ^5.0.1
+  shimmer: ^4.0.0
+  cached_network_image: ^4.0.7
+  url_launcher: ^6.3.3
+  google_mobile_ads: ^9.2.0
 
 dev_dependencies:
   flutter_test:

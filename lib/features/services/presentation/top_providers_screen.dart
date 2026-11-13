@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/cached_app_image.dart';
 import '../data/services_repository.dart';
 
 class TopProvidersScreen extends ConsumerWidget {
@@ -73,20 +74,9 @@ class TopProvidersScreen extends ConsumerWidget {
                           Stack(
                             clipBehavior: Clip.none,
                             children: [
-                              CircleAvatar(
+                              CachedAppAvatar(
+                                imageUrl: photoUrl,
                                 radius: 28,
-                                backgroundColor: const Color(0xFF303030),
-                                backgroundImage:
-                                    photoUrl == null || photoUrl.isEmpty
-                                    ? null
-                                    : NetworkImage(photoUrl),
-                                child: photoUrl == null || photoUrl.isEmpty
-                                    ? const Icon(
-                                        Icons.person,
-                                        color: Colors.white70,
-                                        size: 28,
-                                      )
-                                    : null,
                               ),
                               Positioned(
                                 right: -5,

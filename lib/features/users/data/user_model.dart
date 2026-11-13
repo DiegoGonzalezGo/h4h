@@ -44,9 +44,11 @@ class UserModel {
       phone: map['phone']?.toString() ?? '',
       bio: map['bio']?.toString(),
       profilePictureUrl: _profilePictureUrlFrom(map),
-      isProviderSetupComplete: map['isProviderSetupComplete'] == true,
+      isProviderSetupComplete:
+          map['hasCompletedProviderProfile'] == true ||
+          map['isProviderSetupComplete'] == true,
       roles: List<String>.from(map['roles'] ?? []),
-      skills: map['skills'] != null ? List<String>.from(map['skills']) : [],
+      skills: _stringListFrom(map['skills'] ?? map['specialties']),
       savedServices: map['savedServices'] is List
           ? List<String>.from(map['savedServices'])
           : const [],
@@ -91,6 +93,23 @@ class UserModel {
 
     final legacyPhotoUrl = map['photoUrl']?.toString();
     return legacyPhotoUrl?.isEmpty == true ? null : legacyPhotoUrl;
+  }
+
+  static List<String> _stringListFrom(Object? value) {
+    if (value is Iterable) {
+      return value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    if (value is String) {
+      return value
+          .split(',')
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return const [];
   }
 
   UserModel copyWith({

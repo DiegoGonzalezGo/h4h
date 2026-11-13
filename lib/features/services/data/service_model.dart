@@ -6,6 +6,7 @@ class ServiceModel {
   final double price;
   final bool isActive;
   final String category; // <-- NUEVO CAMPO
+  final String? inactiveReason;
 
   ServiceModel({
     required this.id,
@@ -15,6 +16,7 @@ class ServiceModel {
     required this.price,
     this.isActive = true,
     this.category = 'General', // Valor por defecto
+    this.inactiveReason,
   });
 
   factory ServiceModel.fromMap(Map<String, dynamic> map, String documentId) {
@@ -26,6 +28,7 @@ class ServiceModel {
       price: (map['price'] ?? 0.0).toDouble(),
       isActive: map['isActive'] ?? true,
       category: map['category'] ?? 'General', // <-- LO LEEMOS
+      inactiveReason: map['inactiveReason']?.toString(),
     );
   }
 
@@ -37,6 +40,7 @@ class ServiceModel {
       'price': price,
       'isActive': isActive,
       'category': category, // <-- LO GUARDAMOS
+      if (inactiveReason != null) 'inactiveReason': inactiveReason,
     };
   }
 }

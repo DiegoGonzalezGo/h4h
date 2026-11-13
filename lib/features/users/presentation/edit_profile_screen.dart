@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Agregamos Firestore
 import '../data/user_repository.dart';
+import '../../../core/widgets/cached_app_image.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -107,19 +108,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           children: [
             GestureDetector(
               onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.blue.shade50,
-                // Lógica de imagen: Si hay una nueva seleccionada, la muestra. Si no, muestra la de la base de datos si existe.
-                backgroundImage: _selectedImage != null 
-                    ? FileImage(_selectedImage!) 
-                    : (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty 
-                        ? NetworkImage(_existingPhotoUrl!) as ImageProvider 
-                        : null),
-                child: _selectedImage == null && (_existingPhotoUrl == null || _existingPhotoUrl!.isEmpty)
-                    ? const Icon(Icons.add_a_photo, size: 40, color: Colors.blue)
-                    : null,
-              ),
+              child: _selectedImage != null
+                  ? CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.blue.shade50,
+                      backgroundImage: FileImage(_selectedImage!),
+                    )
+                  : CachedAppAvatar(
+                      imageUrl: _existingPhotoUrl,
+                      radius: 60,
+                      backgroundColor: Colors.blue.shade50,
+                      fallbackIcon: Icons.add_a_photo,
+                    ),
             ),
             const SizedBox(height: 12),
             TextButton(

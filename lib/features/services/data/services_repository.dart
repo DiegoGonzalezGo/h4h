@@ -50,8 +50,27 @@ class ServicesRepository {
 
   // Cambia el estado de activo/inactivo
   Future<void> toggleServiceStatus(String serviceId, bool currentStatus) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Inicia sesión para administrar servicios.');
+
+    if (!currentStatus) {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      final plan = userData?['plan']?.toString().toLowerCase();
+      final hasProviderPlan =
+          plan == 'pro' ||
+          plan == 'elite' ||
+          userData?['isPro'] == true ||
+          userData?['isElite'] == true ||
+          userData?['isPremium'] == true;
+      if (!hasProviderPlan) {
+        throw StateError('Se requiere el Plan Pro o Élite para reactivar servicios.');
+      }
+    }
+
     await _firestore.collection('services').doc(serviceId).update({
       'isActive': !currentStatus, // Invierte el estado actual
+      'inactiveReason': currentStatus ? 'manual' : FieldValue.delete(),
     });
   }
 

@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/cached_app_image.dart';
+
 class FullScreenImageViewer extends StatelessWidget {
   final String imageUrl;
+  final String title;
 
-  const FullScreenImageViewer({super.key, required this.imageUrl});
+  const FullScreenImageViewer({
+    super.key,
+    required this.imageUrl,
+    this.title = 'Evidencia de trabajo',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,24 +21,43 @@ class FullScreenImageViewer extends StatelessWidget {
         elevation: 0,
         foregroundColor: Colors.white,
       ),
-      body: Center(
-        child: InteractiveViewer(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.broken_image_outlined,
-              color: Colors.white70,
-              size: 48,
+      body: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: InteractiveViewer(
+              child: CachedAppImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.contain,
+                errorIconSize: 48,
+              ),
             ),
           ),
-        ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 24,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Text(
+                title.trim().isEmpty ? 'Evidencia de trabajo' : title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

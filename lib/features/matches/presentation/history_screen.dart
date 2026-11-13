@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/glassmorphism.dart';
 import '../../services/data/services_repository.dart';
 import '../../users/data/provider_mode.dart';
 import '../data/matches_repository.dart';
@@ -26,137 +27,152 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Historial de servicios')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: List.generate(3, (index) {
-                const labels = ['Todos', 'Completados', 'Cancelados'];
-                final isSelected = _selectedFilter == index;
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Historial de servicios'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: GlowBackground(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: List.generate(3, (index) {
+                  const labels = ['Todos', 'Completados', 'Cancelados'];
+                  final isSelected = _selectedFilter == index;
 
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: index == 2 ? 0 : 8),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => setState(() => _selectedFilter = index),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 44),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isSelected ? null : const Color(0xFF1E1E1E),
-                          gradient: isSelected
-                              ? const LinearGradient(
-                                  colors: [
-                                    Color(0xFF6A11CB),
-                                    Color(0xFF2575FC),
-                                  ],
-                                )
-                              : null,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          labels[index],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: index == 2 ? 0 : 8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _selectedFilter = index),
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 44),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? null
+                                : Colors.white.withValues(alpha: 0.05),
+                            gradient: isSelected
+                                ? const LinearGradient(
+                                    colors: [
+                                      Color(0xFF6A11CB),
+                                      Color(0xFF2575FC),
+                                    ],
+                                  )
+                                : null,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected
+                                ? null
+                                : Border.all(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                  ),
+                          ),
+                          child: Text(
+                            labels[index],
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white70,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }),
+                  );
+                }),
+              ),
             ),
-          ),
-          Expanded(
-            child: matchesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error: $error')),
-              data: (matches) {
-                if (matches.isEmpty) {
-                  return const Center(
-                    child: Text('Aún no tienes servicios en tu historial.'),
-                  );
-                }
+            Expanded(
+              child: matchesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(child: Text('Error: $error')),
+                data: (matches) {
+                  if (matches.isEmpty) {
+                    return const Center(
+                      child: Text('Aún no tienes servicios en tu historial.'),
+                    );
+                  }
 
-                final filteredMatches = switch (_selectedFilter) {
-                  1 =>
-                    matches
-                        .where((match) => match.status == 'completed')
-                        .toList(),
-                  2 =>
-                    matches
-                        .where((match) => match.status == 'cancelled')
-                        .toList(),
-                  _ => matches,
-                };
+                  final filteredMatches = switch (_selectedFilter) {
+                    1 =>
+                      matches
+                          .where((match) => match.status == 'completed')
+                          .toList(),
+                    2 =>
+                      matches
+                          .where((match) => match.status == 'cancelled')
+                          .toList(),
+                    _ => matches,
+                  };
 
-                if (filteredMatches.isEmpty) {
-                  return const Center(
-                    child: Text('No hay servicios para este filtro.'),
-                  );
-                }
+                  if (filteredMatches.isEmpty) {
+                    return const Center(
+                      child: Text('No hay servicios para este filtro.'),
+                    );
+                  }
 
-                final groupedMatches = <DateTime?, List<MatchModel>>{};
-                for (final match in filteredMatches) {
-                  final completedAt = match.completedAt;
-                  final period = completedAt == null
-                      ? null
-                      : DateTime(completedAt.year, completedAt.month);
-                  groupedMatches.putIfAbsent(period, () => []).add(match);
-                }
+                  final groupedMatches = <DateTime?, List<MatchModel>>{};
+                  for (final match in filteredMatches) {
+                    final completedAt = match.completedAt;
+                    final period = completedAt == null
+                        ? null
+                        : DateTime(completedAt.year, completedAt.month);
+                    groupedMatches.putIfAbsent(period, () => []).add(match);
+                  }
 
-                final periods = groupedMatches.keys.toList()
-                  ..sort((a, b) {
-                    if (a == null) return 1;
-                    if (b == null) return -1;
-                    return b.compareTo(a);
-                  });
+                  final periods = groupedMatches.keys.toList()
+                    ..sort((a, b) {
+                      if (a == null) return 1;
+                      if (b == null) return -1;
+                      return b.compareTo(a);
+                    });
 
-                for (final periodMatches in groupedMatches.values) {
-                  periodMatches.sort((a, b) {
-                    final aDate = a.completedAt;
-                    final bDate = b.completedAt;
-                    if (aDate == null) return bDate == null ? 0 : 1;
-                    if (bDate == null) return -1;
-                    return bDate.compareTo(aDate);
-                  });
-                }
+                  for (final periodMatches in groupedMatches.values) {
+                    periodMatches.sort((a, b) {
+                      final aDate = a.completedAt;
+                      final bDate = b.completedAt;
+                      if (aDate == null) return bDate == null ? 0 : 1;
+                      if (bDate == null) return -1;
+                      return bDate.compareTo(aDate);
+                    });
+                  }
 
-                return ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  children: [
-                    for (final period in periods) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
-                        child: Text(
-                          period == null
-                              ? 'Fecha no disponible'
-                              : _formatHistoryMonth(period),
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    children: [
+                      for (final period in periods) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+                          child: Text(
+                            period == null
+                                ? 'Fecha no disponible'
+                                : _formatHistoryMonth(period),
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      for (final match in groupedMatches[period]!)
-                        _HistoryMatchCard(match: match),
+                        for (final match in groupedMatches[period]!)
+                          _HistoryMatchCard(match: match),
+                      ],
                     ],
-                  ],
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -190,14 +206,16 @@ class _HistoryMatchCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final serviceAsync = ref.watch(singleServiceProvider(match.serviceId));
 
-    return Card(
-      color: const Color(0xFF1E1E1E),
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 0,
+    return GlassCard(
+      padding: EdgeInsets.zero,
       margin: const EdgeInsets.only(bottom: 12),
       child: serviceAsync.when(
-        loading: () => const ListTile(title: Text('Cargando servicio...')),
+        loading: () => const ListTile(
+          title: Text(
+            'Cargando servicio...',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
         error: (error, stack) => _buildTile('Servicio no disponible'),
         data: (service) =>
             _buildTile(service?.title ?? 'Servicio no disponible (eliminado)'),
@@ -211,10 +229,6 @@ class _HistoryMatchCard extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [

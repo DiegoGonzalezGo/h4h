@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/widgets/loading_skeletons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/services_repository.dart';
@@ -23,6 +25,76 @@ class ServicesFeedScreen extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<ServicesFeedScreen> createState() => _ServicesFeedScreenState();
+}
+
+class _NotificationBellIcon extends StatefulWidget {
+  const _NotificationBellIcon({
+    required this.hasUnread,
+    required this.unreadCount,
+  });
+
+  final bool hasUnread;
+  final int unreadCount;
+
+  @override
+  State<_NotificationBellIcon> createState() => _NotificationBellIconState();
+}
+
+class _NotificationBellIconState extends State<_NotificationBellIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _rotation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 0.5,
+    );
+    _rotation = Tween<double>(begin: -0.1, end: 0.1).animate(_controller);
+    if (widget.hasUnread) _controller.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _NotificationBellIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.hasUnread == oldWidget.hasUnread) return;
+
+    if (widget.hasUnread) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+      _controller.value = 0.5;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bell = AnimatedBuilder(
+      animation: _rotation,
+      child: const Icon(Icons.notifications_none_rounded, size: 28),
+      builder: (context, child) => Transform.rotate(
+        angle: widget.hasUnread ? _rotation.value : 0,
+        child: child,
+      ),
+    );
+
+    if (!widget.hasUnread) return bell;
+
+    return Badge(
+      backgroundColor: Colors.redAccent,
+      label: Text(widget.unreadCount.toString()),
+      child: bell,
+    );
+  }
 }
 
 class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
@@ -119,12 +191,34 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
               .snapshots();
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Servicios Disponibles'),
+        backgroundColor: Colors.black,
         actions: [
           IconButton(
-            icon: const Icon(Icons.emoji_events, color: Colors.amber, size: 28),
             tooltip: 'Top Proveedores',
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.emoji_events_rounded,
+                color: Colors.amberAccent,
+                size: 24,
+                shadows: [Shadow(color: Colors.amber, blurRadius: 10)],
+              ),
+            ),
             onPressed: () {
               context.push('/ranking');
             },
@@ -134,19 +228,13 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
             builder: (context, snapshot) {
               final hasUnreadNotifications =
                   snapshot.hasData && snapshot.data!.docs.isNotEmpty;
-              final icon = hasUnreadNotifications
-                  ? Badge(
-                      backgroundColor: Colors.redAccent,
-                      label: Text(snapshot.data!.docs.length.toString()),
-                      child: const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 28,
-                      ),
-                    )
-                  : const Icon(Icons.notifications_none_rounded, size: 28);
-
               return IconButton(
-                icon: icon,
+                icon: _NotificationBellIcon(
+                  hasUnread: hasUnreadNotifications,
+                  unreadCount: hasUnreadNotifications
+                      ? snapshot.data!.docs.length
+                      : 0,
+                ),
                 tooltip: snapshot.hasError
                     ? 'Error al cargar notificaciones'
                     : 'Notificaciones',
@@ -322,157 +410,207 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
         icon: const Icon(Icons.auto_awesome),
         label: const Text('Match Inteligente'),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/images/logo.png',
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Buscar servicios...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                        ),
-                      ),
-                      onChanged: _updateSearch,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 10),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Categorías',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -110,
+            left: -100,
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+                child: Container(
+                  width: 320,
+                  height: 320,
+                  color: Colors.purpleAccent.withValues(alpha: 0.3),
                 ),
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 48,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  final isSelected = category == _selectedCategory;
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() => _selectedCategory = category);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected ? null : const Color(0xFF2C2C2C),
-                          gradient: isSelected
-                              ? const LinearGradient(
-                                  colors: [
-                                    Colors.purpleAccent,
-                                    Colors.blueAccent,
-                                  ],
-                                )
-                              : null,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          category,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+          Positioned(
+            bottom: -110,
+            right: -100,
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+                child: Container(
+                  width: 320,
+                  height: 320,
+                  color: Colors.cyanAccent.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+          ),
+          CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        'assets/images/logo.png',
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Buscar servicios...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                           ),
+                          onChanged: _updateSearch,
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 10),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Categorías',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 48,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: _categories.length,
+                    itemBuilder: (context, index) {
+                      final category = _categories[index];
+                      final isSelected = category == _selectedCategory;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _selectedCategory = category);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? null
+                                  : const Color(0xFF2C2C2C),
+                              gradient: isSelected
+                                  ? const LinearGradient(
+                                      colors: [
+                                        Colors.purpleAccent,
+                                        Colors.blueAccent,
+                                      ],
+                                    )
+                                  : null,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              category,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white70,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Todos los servicios',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              servicesAsync.when(
+                loading: () => SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => const ServiceCardSkeleton(),
+                      childCount: 4,
+                    ),
+                  ),
+                ),
+                error: (e, stack) =>
+                    SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
+                data: (services) {
+                  final filteredServices = services.where((service) {
+                    final matchesSearch =
+                        _searchQuery.isEmpty ||
+                        service.title.toLowerCase().contains(_searchQuery) ||
+                        service.description.toLowerCase().contains(
+                          _searchQuery,
+                        );
+                    final matchesCategory =
+                        _selectedCategory == 'Todas' ||
+                        service.category == _selectedCategory;
+
+                    return matchesSearch && matchesCategory;
+                  }).toList();
+
+                  if (filteredServices.isEmpty) {
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text('No se encontraron servicios.'),
+                      ),
+                    );
+                  }
+                  return SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList.builder(
+                      itemCount: filteredServices.length,
+                      itemBuilder: (context, index) {
+                        final service = filteredServices[index];
+                        return ServiceCard(
+                          service: service,
+                          onTap: () => _showServiceModal(context, service),
+                        );
+                      },
                     ),
                   );
                 },
               ),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Todos los servicios',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ),
-          servicesAsync.when(
-            loading: () => const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (e, stack) =>
-                SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
-            data: (services) {
-              final filteredServices = services.where((service) {
-                final matchesSearch =
-                    _searchQuery.isEmpty ||
-                    service.title.toLowerCase().contains(_searchQuery) ||
-                    service.description.toLowerCase().contains(_searchQuery);
-                final matchesCategory =
-                    _selectedCategory == 'Todas' ||
-                    service.category == _selectedCategory;
-
-                return matchesSearch && matchesCategory;
-              }).toList();
-
-              if (filteredServices.isEmpty) {
-                return const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: Text('No se encontraron servicios.')),
-                );
-              }
-
-              return SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverList.builder(
-                  itemCount: filteredServices.length,
-                  itemBuilder: (context, index) {
-                    final service = filteredServices[index];
-                    return ServiceCard(
-                      service: service,
-                      onTap: () => _showServiceModal(context, service),
-                    );
-                  },
-                ),
-              );
-            },
+            ],
           ),
         ],
       ),
@@ -485,226 +623,330 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black54,
-      builder: (dialogContext) => BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          child: Consumer(
-            builder: (context, modalRef, child) {
-              final activeMatches =
-                  (modalRef.watch(clientActiveMatchesProvider).value ?? [])
-                      .where((item) => item.status != 'cancelled')
-                      .toList();
-              final existingMatch = activeMatches
-                  .where((item) => item.serviceId == match.id)
-                  .firstOrNull;
-              final isRequested = existingMatch != null;
-              final savedAddresses =
-                  modalRef
-                      .watch(currentUserControllerProvider)
-                      .value
-                      ?.addresses ??
-                  const <AddressModel>[];
-              final providerProfileAsync = modalRef.watch(
-                providerProfileProvider(match.providerId),
-              );
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Consumer(
+          builder: (context, modalRef, child) {
+            final activeMatches =
+                (modalRef.watch(clientActiveMatchesProvider).value ?? [])
+                    .where((item) => item.status != 'cancelled')
+                    .toList();
+            final existingMatch = activeMatches
+                .where((item) => item.serviceId == match.id)
+                .firstOrNull;
+            final isRequested = existingMatch != null;
+            final savedAddresses =
+                modalRef
+                    .watch(currentUserControllerProvider)
+                    .value
+                    ?.addresses ??
+                const <AddressModel>[];
+            final providerProfileAsync = modalRef.watch(
+              providerProfileProvider(match.providerId),
+            );
 
-              String buttonText = 'Solicitar Servicio';
-              if (isRequested) {
-                if (existingMatch.status == 'pending') {
-                  buttonText = 'Pendiente';
-                } else if (existingMatch.status == 'accepted') {
-                  buttonText = 'Aceptada';
-                } else if (existingMatch.status == 'rejected') {
-                  buttonText = 'Rechazada';
-                } else if (existingMatch.status == 'completed') {
-                  buttonText = 'Completada';
-                }
+            String buttonText = 'Solicitar Servicio';
+            if (isRequested) {
+              if (existingMatch.status == 'pending') {
+                buttonText = 'Pendiente';
+              } else if (existingMatch.status == 'accepted') {
+                buttonText = 'Aceptada';
+              } else if (existingMatch.status == 'rejected') {
+                buttonText = 'Rechazada';
+              } else if (existingMatch.status == 'completed') {
+                buttonText = 'Completada';
               }
+            }
 
-              return StatefulBuilder(
-                builder: (context, setModalState) => ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(context).height * 0.82,
-                    maxWidth: 520,
+            return StatefulBuilder(
+              builder: (context, setModalState) => ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+                  maxWidth: 520,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6A11CB).withValues(alpha: 0.6),
+                        offset: const Offset(-6, -6),
+                        blurRadius: 28,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF2575FC).withValues(alpha: 0.6),
+                        offset: const Offset(6, 6),
+                        blurRadius: 28,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6A11CB).withValues(alpha: 0.6),
-                          offset: const Offset(-6, -6),
-                          blurRadius: 28,
-                          spreadRadius: 2,
-                        ),
-                        BoxShadow(
-                          color: const Color(0xFF2575FC).withValues(alpha: 0.6),
-                          offset: const Offset(6, 6),
-                          blurRadius: 28,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: IconButton(
-                              tooltip: 'Cerrar',
-                              onPressed: () => Navigator.pop(dialogContext),
-                              icon: const Icon(Icons.close),
-                            ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
                           ),
-                          Text(
-                            match.title,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  tooltip: 'Cerrar',
+                                  onPressed: () => Navigator.pop(dialogContext),
+                                  icon: const Icon(Icons.close),
+                                ),
+                              ),
+                              Text(
+                                match.title,
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: 12),
+                              providerProfileAsync.when(
+                                data: (data) => Text(
+                                  'Proveedor: ${data['name'] ?? 'Proveedor'}',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                                loading: () => const Text(
+                                  'Cargando proveedor...',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                                error: (error, stack) => const Text(
+                                  'Proveedor no disponible',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                match.description,
+                                style: const TextStyle(
                                   color: Colors.white,
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                '\$${match.price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Color(0xFF00B4DB),
+                                  fontSize: 24,
                                   fontWeight: FontWeight.bold,
                                 ),
-                          ),
-                          const SizedBox(height: 12),
-                          providerProfileAsync.when(
-                            data: (data) => Text(
-                              'Proveedor: ${data['name'] ?? 'Proveedor'}',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                            loading: () => const Text(
-                              'Cargando proveedor...',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                            error: (error, stack) => const Text(
-                              'Proveedor no disponible',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            match.description,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            '\$${match.price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Color(0xFF00B4DB),
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          if (!isRequested) ...[
-                            const Text(
-                              'Selecciona una dirección para el servicio',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            if (savedAddresses.isEmpty)
-                              const Text(
-                                'Aún no tienes direcciones guardadas.',
-                                style: TextStyle(color: Colors.white60),
-                              )
-                            else
-                              SizedBox(
-                                height: 82,
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: savedAddresses.length,
-                                  itemBuilder: (context, index) {
-                                    final address = savedAddresses[index];
-                                    final isSelected =
-                                        selectedAddress?.id == address.id;
+                              const SizedBox(height: 20),
+                              if (!isRequested) ...[
+                                const Text(
+                                  'Selecciona una dirección para el servicio',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                if (savedAddresses.isEmpty)
+                                  const Text(
+                                    'Aún no tienes direcciones guardadas.',
+                                    style: TextStyle(color: Colors.white60),
+                                  )
+                                else
+                                  SizedBox(
+                                    height: 82,
+                                    child: ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: savedAddresses.length,
+                                      itemBuilder: (context, index) {
+                                        final address = savedAddresses[index];
+                                        final isSelected =
+                                            selectedAddress?.id == address.id;
 
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: ChoiceChip(
-                                        selected: isSelected,
-                                        onSelected: (_) {
-                                          setModalState(() {
-                                            selectedAddress = address;
-                                          });
-                                        },
-                                        backgroundColor: const Color(
-                                          0xFF1E1E1E,
-                                        ),
-                                        selectedColor: const Color(0xFF1E1E1E),
-                                        side: BorderSide(
-                                          color: isSelected
-                                              ? Colors.cyanAccent
-                                              : Colors.grey.shade700,
-                                          width: isSelected ? 1.5 : 1,
-                                        ),
-                                        label: SizedBox(
-                                          width: 130,
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                address.alias,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: isSelected
-                                                      ? Colors.cyanAccent
-                                                      : Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          child: ChoiceChip(
+                                            selected: isSelected,
+                                            onSelected: (_) {
+                                              setModalState(() {
+                                                selectedAddress = address;
+                                              });
+                                            },
+                                            backgroundColor: const Color(
+                                              0xFF1E1E1E,
+                                            ),
+                                            selectedColor: const Color(
+                                              0xFF1E1E1E,
+                                            ),
+                                            side: BorderSide(
+                                              color: isSelected
+                                                  ? Colors.cyanAccent
+                                                  : Colors.grey.shade700,
+                                              width: isSelected ? 1.5 : 1,
+                                            ),
+                                            label: SizedBox(
+                                              width: 130,
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    address.alias,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: isSelected
+                                                          ? Colors.cyanAccent
+                                                          : Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 3),
+                                                  Text(
+                                                    address.street,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.white60,
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                address.street,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  color: Colors.white60,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                const SizedBox(height: 24),
+                              ],
+                              if (isRequested &&
+                                  existingMatch.status == 'pending')
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF303030),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: const Center(
+                                          child: Text(
+                                            'Pendiente',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            const SizedBox(height: 24),
-                          ],
-                          if (isRequested && existingMatch.status == 'pending')
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
+                                    ),
+                                    const SizedBox(width: 12),
+                                    TextButton.icon(
+                                      onPressed: () => _showCancelDialog(
+                                        context,
+                                        existingMatch,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.cancel_outlined,
+                                        color: Colors.redAccent,
+                                      ),
+                                      label: const Text(
+                                        'Cancelar',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                InkWell(
+                                  onTap: isRequested
+                                      ? null
+                                      : () {
+                                          final address = selectedAddress;
+                                          if (address == null) {
+                                            ScaffoldMessenger.of(context)
+                                              ..hideCurrentSnackBar()
+                                              ..showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Selecciona una dirección',
+                                                  ),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            return;
+                                          }
+
+                                          Navigator.of(dialogContext).pop();
+                                          WidgetsBinding.instance
+                                              .addPostFrameCallback((_) {
+                                                if (context.mounted) {
+                                                  Navigator.of(context).push(
+                                                    MaterialPageRoute<void>(
+                                                      builder: (context) =>
+                                                          CheckoutScreen(
+                                                            servicio: match,
+                                                            selectedAddress:
+                                                                address,
+                                                          ),
+                                                    ),
+                                                  );
+                                                }
+                                              });
+                                        },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Ink(
+                                    width: double.infinity,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 14,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF303030),
+                                      gradient: isRequested
+                                          ? null
+                                          : const LinearGradient(
+                                              colors: [
+                                                Color(0xFF6A11CB),
+                                                Color(0xFF2575FC),
+                                              ],
+                                            ),
+                                      color: isRequested
+                                          ? const Color(0xFF303030)
+                                          : null,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: const Center(
+                                    child: Center(
                                       child: Text(
-                                        'Pendiente',
-                                        style: TextStyle(
+                                        buttonText,
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -712,97 +954,16 @@ class _ServicesFeedScreenState extends ConsumerState<ServicesFeedScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                TextButton.icon(
-                                  onPressed: () =>
-                                      _showCancelDialog(context, existingMatch),
-                                  icon: const Icon(
-                                    Icons.cancel_outlined,
-                                    color: Colors.redAccent,
-                                  ),
-                                  label: const Text(
-                                    'Cancelar',
-                                    style: TextStyle(color: Colors.redAccent),
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            InkWell(
-                              onTap: isRequested
-                                  ? null
-                                  : () {
-                                      final address = selectedAddress;
-                                      if (address == null) {
-                                        ScaffoldMessenger.of(context)
-                                          ..hideCurrentSnackBar()
-                                          ..showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Selecciona una dirección',
-                                              ),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        return;
-                                      }
-
-                                      Navigator.of(dialogContext).pop();
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            if (context.mounted) {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute<void>(
-                                                  builder: (context) =>
-                                                      CheckoutScreen(
-                                                        servicio: match,
-                                                        selectedAddress:
-                                                            address,
-                                                      ),
-                                                ),
-                                              );
-                                            }
-                                          });
-                                    },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Ink(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: isRequested
-                                      ? null
-                                      : const LinearGradient(
-                                          colors: [
-                                            Color(0xFF6A11CB),
-                                            Color(0xFF2575FC),
-                                          ],
-                                        ),
-                                  color: isRequested
-                                      ? const Color(0xFF303030)
-                                      : null,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    buttonText,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

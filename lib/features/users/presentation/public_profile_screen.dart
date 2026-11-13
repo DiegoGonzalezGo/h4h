@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import '../../../core/widgets/cached_app_image.dart';
 import '../data/user_repository.dart';
 import 'provider_portfolio_section.dart';
 import 'report_user_menu.dart';
@@ -53,19 +53,10 @@ class PublicProfileScreen extends ConsumerWidget {
                       );
                     }
                   },
-                  child: CircleAvatar(
+                  child: CachedAppAvatar(
+                    imageUrl: photoUrl,
                     radius: 60,
                     backgroundColor: Colors.blue.shade100,
-                    backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                        ? NetworkImage(photoUrl)
-                        : null,
-                    child: (photoUrl == null || photoUrl.isEmpty)
-                        ? const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Colors.white,
-                          )
-                        : null,
                   ),
                 ),
               ),
@@ -135,23 +126,10 @@ void _showZoomedImage(BuildContext context, String imageUrl, String userName) {
               maxScale: 4.0,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
+                child: CachedAppImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Text(
-                        'No se pudo cargar la imagen',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    );
-                  },
+                  errorIconSize: 48,
                 ),
               ),
             ),

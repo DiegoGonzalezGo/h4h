@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Importante para la navegación al chat
 
+import '../../../core/widgets/cached_app_image.dart';
+import '../../../core/widgets/glassmorphism.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../data/matches_repository.dart';
 import '../data/match_model.dart';
@@ -32,13 +34,16 @@ class _ProviderMatchesScreenState extends ConsumerState<ProviderMatchesScreen> {
             height: 46,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: isSelected ? null : const Color(0xFF1E1E1E),
+              color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
               gradient: isSelected
                   ? const LinearGradient(
                       colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
                     )
                   : null,
               borderRadius: BorderRadius.circular(12),
+              border: isSelected
+                  ? null
+                  : Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Text(
               label,
@@ -59,82 +64,90 @@ class _ProviderMatchesScreenState extends ConsumerState<ProviderMatchesScreen> {
     final matchesAsync = ref.watch(providerActiveMatchesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Solicitudes Recibidas')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                _tabButton('Por Responder', 0),
-                _tabButton('Aceptadas', 1),
-              ],
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Solicitudes Recibidas'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: GlowBackground(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  _tabButton('Por Responder', 0),
+                  _tabButton('Aceptadas', 1),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: matchesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error: $error')),
-              data: (matches) {
-                final selectedStatus = selectedTabIndex == 0
-                    ? 'pending'
-                    : 'accepted';
-                final visibleMatches = matches
-                    .where((match) => match.status == selectedStatus)
-                    .toList();
+            Expanded(
+              child: matchesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(child: Text('Error: $error')),
+                data: (matches) {
+                  final selectedStatus = selectedTabIndex == 0
+                      ? 'pending'
+                      : 'accepted';
+                  final visibleMatches = matches
+                      .where((match) => match.status == selectedStatus)
+                      .toList();
 
-                if (visibleMatches.isEmpty) {
-                  return Center(
-                    child: Text(
-                      selectedTabIndex == 0
-                          ? 'No tienes solicitudes por responder.'
-                          : 'No tienes solicitudes aceptadas.',
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: visibleMatches.length,
-                  itemBuilder: (context, index) {
-                    final match = visibleMatches[index];
-                    return _ProviderRequestCard(
-                      match: match,
-                      isPending: selectedTabIndex == 0,
-                      onAccept: () {
-                        ref
-                            .read(matchesRepositoryProvider)
-                            .updateMatchStatus(match.id, 'accepted');
-                      },
-                      onReject: () async {
-                        try {
-                          await ref
-                              .read(matchesRepositoryProvider)
-                              .cancelAndRefundService(
-                                requestId: match.id,
-                                clientId: match.clientId,
-                                amount: match.servicePrice ?? 0,
-                                providerRejected: true,
-                              );
-                        } catch (error) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'No se pudo rechazar la solicitud: $error',
-                                ),
-                              ),
-                            );
-                          }
-                        }
-                      },
+                  if (visibleMatches.isEmpty) {
+                    return Center(
+                      child: Text(
+                        selectedTabIndex == 0
+                            ? 'No tienes solicitudes por responder.'
+                            : 'No tienes solicitudes aceptadas.',
+                      ),
                     );
-                  },
-                );
-              },
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: visibleMatches.length,
+                    itemBuilder: (context, index) {
+                      final match = visibleMatches[index];
+                      return _ProviderRequestCard(
+                        match: match,
+                        isPending: selectedTabIndex == 0,
+                        onAccept: () {
+                          ref
+                              .read(matchesRepositoryProvider)
+                              .updateMatchStatus(match.id, 'accepted');
+                        },
+                        onReject: () async {
+                          try {
+                            await ref
+                                .read(matchesRepositoryProvider)
+                                .cancelAndRefundService(
+                                  requestId: match.id,
+                                  clientId: match.clientId,
+                                  amount: match.servicePrice ?? 0,
+                                  providerRejected: true,
+                                );
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'No se pudo rechazar la solicitud: $error',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -191,21 +204,13 @@ class _ProviderRequestCard extends ConsumerWidget {
     required String serviceTitle,
     double? price,
   }) {
-    final avatar = CircleAvatar(
-      backgroundColor: const Color(0xFF303030),
-      backgroundImage: photoUrl == null ? null : NetworkImage(photoUrl),
-      child: photoUrl == null
-          ? const Icon(Icons.person, color: Colors.white70)
-          : null,
-    );
+    final avatar = CachedAppAvatar(imageUrl: photoUrl, radius: 20);
 
     if (!isPending) {
-      return Container(
+      return GlassCard(
+        padding: EdgeInsets.zero,
         margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(12),
-        ),
+        borderRadius: 16,
         child: ListTile(
           leading: avatar,
           title: Text(
@@ -230,13 +235,9 @@ class _ProviderRequestCard extends ConsumerWidget {
       );
     }
 
-    return Container(
+    return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      borderRadius: 16,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

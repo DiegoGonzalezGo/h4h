@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/glassmorphism.dart';
 import '../data/user_repository.dart';
 
 class WalletScreen extends ConsumerWidget {
@@ -32,152 +33,142 @@ class WalletScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Saldo Disponible',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                userAsync.when(
-                  data: (user) => FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      user == null
-                          ? 'Saldo no disponible'
-                          : '${currencyFormat.format(user.balance)} MXN',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  loading: () => const Text(
-                    'Cargando saldo...',
-                    style: TextStyle(color: Colors.white70, fontSize: 18),
-                  ),
-                  error: (error, stackTrace) => const Text(
-                    'No se pudo cargar el saldo',
-                    style: TextStyle(color: Colors.white70, fontSize: 18),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextButton.icon(
-                  onPressed: () => _showComingSoon(context, 'La recarga'),
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.18),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Recargar Saldo'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          const Text(
-            'Mis Tarjetas',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 48,
-                  height: 32,
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 0,
-                        top: 4,
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Color(0xFFEB001B),
-                        ),
-                      ),
-                      Positioned(
-                        left: 15,
-                        top: 4,
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Color(0xFFF79E1B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    '**** **** **** 4242',
+      body: GlowBackground(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            GlassCard(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Saldo Disponible',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 15,
                     ),
                   ),
-                ),
-                const Text('12/28', style: TextStyle(color: Colors.white70)),
-              ],
+                  const SizedBox(height: 8),
+                  userAsync.when(
+                    data: (user) => FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        user == null
+                            ? 'Saldo no disponible'
+                            : '${currencyFormat.format(user.balance)} MXN',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    loading: () => const Text(
+                      'Cargando saldo...',
+                      style: TextStyle(color: Colors.white70, fontSize: 18),
+                    ),
+                    error: (error, stackTrace) => const Text(
+                      'No se pudo cargar el saldo',
+                      style: TextStyle(color: Colors.white70, fontSize: 18),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton.icon(
+                    onPressed: () => _showComingSoon(context, 'La recarga'),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.18),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Recargar Saldo'),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _showComingSoon(context, 'Agregar tarjetas'),
-              style: TextButton.styleFrom(foregroundColor: Colors.cyanAccent),
-              icon: const Icon(Icons.add),
-              label: const Text('Agregar método de pago'),
+            const SizedBox(height: 28),
+            const Text(
+              'Mis Tarjetas',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Movimientos Recientes',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            const SizedBox(height: 12),
+            const GlassCard(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 48,
+                    height: 32,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 0,
+                          top: 4,
+                          child: CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Color(0xFFEB001B),
+                          ),
+                        ),
+                        Positioned(
+                          left: 15,
+                          top: 4,
+                          child: CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Color(0xFFF79E1B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '**** **** **** 4242',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text('12/28', style: TextStyle(color: Colors.white70)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const _WalletMovements(),
-        ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _showComingSoon(context, 'Agregar tarjetas'),
+                style: TextButton.styleFrom(foregroundColor: Colors.cyanAccent),
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar método de pago'),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Movimientos Recientes',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const GlassCard(child: _WalletMovements()),
+          ],
+        ),
       ),
     );
   }

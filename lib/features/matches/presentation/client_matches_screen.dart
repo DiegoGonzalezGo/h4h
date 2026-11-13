@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Importante para poder navegar al chat
 
+import '../../../core/widgets/glassmorphism.dart';
 import '../data/matches_repository.dart';
 import '../data/match_model.dart';
 import '../../services/data/services_repository.dart';
@@ -28,13 +29,16 @@ class _ClientMatchesScreenState extends ConsumerState<ClientMatchesScreen> {
           height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSelected ? null : const Color(0xFF1E1E1E),
+            color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
             gradient: isSelected
                 ? const LinearGradient(
                     colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
                   )
                 : null,
             borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? null
+                : Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Text(
             label,
@@ -54,80 +58,82 @@ class _ClientMatchesScreenState extends ConsumerState<ClientMatchesScreen> {
     final matchesAsync = ref.watch(clientActiveMatchesProvider);
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         leading: const BackButton(color: Colors.white),
         title: const Text('Mis Solicitudes Enviadas'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(16),
+      body: GlowBackground(
+        child: Column(
+          children: [
+            GlassCard(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.all(4),
+              child: Row(children: [_tab('En Espera', 0), _tab('Activas', 1)]),
             ),
-            child: Row(children: [_tab('En Espera', 0), _tab('Activas', 1)]),
-          ),
-          Expanded(
-            child: matchesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Error: $error')),
-              data: (matches) {
-                if (matches.isEmpty) {
-                  return const Center(
-                    child: Text('No has solicitado ningún servicio aún.'),
-                  );
-                }
-
-                final status = selectedTabIndex == 0 ? 'pending' : 'accepted';
-                final visibleMatches = matches
-                    .where((match) => match.status == status)
-                    .toList();
-
-                if (visibleMatches.isEmpty) {
-                  return Center(
-                    child: Text(
-                      selectedTabIndex == 0
-                          ? 'No tienes solicitudes en espera.'
-                          : 'No tienes solicitudes activas.',
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: visibleMatches.length,
-                  itemBuilder: (context, index) {
-                    final match = visibleMatches[index];
-                    return _ClientRequestCard(
-                      match: match,
-                      isPending: selectedTabIndex == 0,
-                      onCancel: () => _showCancelDialog(context, match, ref),
-                      onRate: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => RatingDialog(
-                            onSubmit: (rating) {
-                              ref
-                                  .read(matchesRepositoryProvider)
-                                  .completeMatchAndRate(
-                                    match.id,
-                                    match.providerId,
-                                    rating,
-                                  );
-                            },
-                          ),
-                        );
-                      },
-                      onChat: () => context.push('/chat/${match.id}'),
+            Expanded(
+              child: matchesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(child: Text('Error: $error')),
+                data: (matches) {
+                  if (matches.isEmpty) {
+                    return const Center(
+                      child: Text('No has solicitado ningún servicio aún.'),
                     );
-                  },
-                );
-              },
+                  }
+
+                  final status = selectedTabIndex == 0 ? 'pending' : 'accepted';
+                  final visibleMatches = matches
+                      .where((match) => match.status == status)
+                      .toList();
+
+                  if (visibleMatches.isEmpty) {
+                    return Center(
+                      child: Text(
+                        selectedTabIndex == 0
+                            ? 'No tienes solicitudes en espera.'
+                            : 'No tienes solicitudes activas.',
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: visibleMatches.length,
+                    itemBuilder: (context, index) {
+                      final match = visibleMatches[index];
+                      return _ClientRequestCard(
+                        match: match,
+                        isPending: selectedTabIndex == 0,
+                        onCancel: () => _showCancelDialog(context, match, ref),
+                        onRate: () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => RatingDialog(
+                              onSubmit: (rating) {
+                                ref
+                                    .read(matchesRepositoryProvider)
+                                    .completeMatchAndRate(
+                                      match.id,
+                                      match.providerId,
+                                      rating,
+                                    );
+                              },
+                            ),
+                          );
+                        },
+                        onChat: () => context.push('/chat/${match.id}'),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -173,13 +179,9 @@ class _ClientRequestCard extends ConsumerWidget {
     final accent = isPending ? Colors.orangeAccent : Colors.greenAccent;
     final label = isPending ? 'Pendiente' : 'Aceptada';
 
-    return Container(
+    return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      borderRadius: 16,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

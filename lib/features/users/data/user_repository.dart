@@ -84,7 +84,7 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
   Future<void> completeProviderSetup({
     required String bio,
     required List<String> skills,
-    required File profilePhoto,
+    File? profilePhoto,
   }) async {
     final currentUser = state.value;
     if (currentUser == null) {
@@ -92,12 +92,15 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
     }
 
     try {
-      final storageRef = _storage
-          .ref()
-          .child('avatars')
-          .child('${currentUser.uid}.jpg');
-      await storageRef.putFile(profilePhoto);
-      final photoUrl = await storageRef.getDownloadURL();
+      String? photoUrl;
+      if (profilePhoto != null) {
+        final storageRef = _storage
+            .ref()
+            .child('avatars')
+            .child('${currentUser.uid}.jpg');
+        await storageRef.putFile(profilePhoto);
+        photoUrl = await storageRef.getDownloadURL();
+      }
 
       final updatedUser = currentUser.copyWith(
         bio: bio,
@@ -107,13 +110,22 @@ class CurrentUserController extends StreamNotifier<UserModel?> {
       );
       state = AsyncData(updatedUser);
 
-      await _firestore.collection('users').doc(currentUser.uid).update({
+      final updateData = <String, dynamic>{
         'bio': bio,
         'skills': skills,
-        'profilePictureUrl': photoUrl,
-        'photoUrl': photoUrl,
+        'specialties': skills,
         'isProviderSetupComplete': true,
-      });
+        'hasCompletedProviderProfile': true,
+      };
+      if (photoUrl != null) {
+        updateData
+          ..['profilePictureUrl'] = photoUrl
+          ..['photoUrl'] = photoUrl;
+      }
+      await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .update(updateData);
     } catch (error, stackTrace) {
       state = AsyncData(currentUser);
       Error.throwWithStackTrace(error, stackTrace);
